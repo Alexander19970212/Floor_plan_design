@@ -3,34 +3,7 @@ import matplotlib.pyplot as plt
 
 
 class Particle_wsarm:
-    # def __init__(self, Points_obj, Points_block, obj_distance, koef_obj, block_distance, koef_block, indexs_cl, step):
-    #     self.points_block = Points_block
-    #     self.points_obj = Points_obj
-    #     self.obj_distance = obj_distance
-    #     self.koef_obj = koef_obj
-    #     self.block_distance = block_distance
-    #     self.koef_block = koef_block
-    #     self.step_value = step
-    #     self.step_save = step
-    #     self.indexs_cl = indexs_cl
-    #
-    #     self.points_obj_x = self.points_obj[:, 0].flatten()
-    #     self.points_obj_y = self.points_obj[:, 1].flatten()
-    #
-    #     self.points_block_x = self.points_block[:, 0].flatten()
-    #     self.points_block_y = self.points_block[:, 1].flatten()
-
-    def __init__(self, cl_att_cl, Num_cl, Points_block, block_cl, bl_att_cl):
-        self.cl_att_cl = cl_att_cl
-        self.Num_cl = Num_cl
-        self.Points_block = Points_block
-        self.block_cl = block_cl
-        self.bl_att_cl = bl_att_cl
-
-
-
-    def intialize(self, Points_obj, Points_block, obj_distance, koef_obj, block_distance, koef_block, indexs_cl, step):
-
+    def __init__(self, Points_obj, Points_block, obj_distance, koef_obj, block_distance, koef_block, indexs_cl, step):
         self.points_block = Points_block
         self.points_obj = Points_obj
         self.obj_distance = obj_distance
@@ -140,21 +113,21 @@ class Particle_wsarm:
         force_block_3 = block_cas_3 * self.koef_block[:, :, 2] - self.koef_block[:, :, 2] * (
                 (block_cas_3 > 0) * 1) * self.block_distance[:, :, 1]
 
-        force_grav_max_dist = force_block_3.max() + 1
+        force_grav_max_dist = force_block_3.max()+1
 
-        grav_mask = (force_block_3 == 0) * force_grav_max_dist
+        grav_mask = (force_block_3 == 0)*force_grav_max_dist
         force_block_3 += grav_mask
-        # print(force_block_3.shape)
+        #print(force_block_3.shape)
 
         ind_min_dist_grav = np.unravel_index(np.argmin(force_block_3, axis=1), force_block_3.shape)
-        # print(ind_min_dist_grav)
-        # force_grav_min_dist = force_block_3.min()
+        #print(ind_min_dist_grav)
+        #force_grav_min_dist = force_block_3.min()
         s_mask = np.zeros_like(force_block_3)
         for i, loc in enumerate(ind_min_dist_grav[1]):
             s_mask[i, loc] = force_block_3[i, loc]
 
         force_block = force_block_1 + force_block_2 + s_mask
-        # force_block[ind_min_dist_grav[0], ind_min_dist_grav[1]] += force_grav_min_dist
+        #force_block[ind_min_dist_grav[0], ind_min_dist_grav[1]] += force_grav_min_dist
         self.force_block = force_block
         # print(np.sum(force_block))
         # print(force_block)
@@ -169,8 +142,15 @@ class Particle_wsarm:
     def step(self):
         # print(self.force_block_x)
         # print(self.force_block_y)
-        self.points_obj_x = self.points_obj_x + self.step_value * (self.force_block_x + self.force_loc_x)
-        self.points_obj_y = self.points_obj_y + self.step_value * (self.force_block_y + self.force_loc_y)
+        bufer_x = self.points_obj_x + self.step_value * (self.force_block_x + self.force_loc_x)
+        bufer_y = self.points_obj_y + self.step_value * (self.force_block_y + self.force_loc_y)
+        bufer_x_mask = (((bufer_x < 8)*1 + (bufer_x > 52)*1) == 0)*1
+        bufer_y_mask = (((bufer_y < 7) * 1 + (bufer_y > 35) * 1) == 0) * 1
+
+
+
+        self.points_obj_x = self.points_obj_x + self.step_value * (self.force_block_x + self.force_loc_x)*bufer_x_mask
+        self.points_obj_y = self.points_obj_y + self.step_value * (self.force_block_y + self.force_loc_y)*bufer_y_mask
 
         # print(self.points_obj_x)
 
@@ -213,8 +193,8 @@ class Particle_wsarm:
             block_distance[:, :, :3]), indexs_cl
 
     def process(self):
-        for t in range(0, 200):
-            self.step_value = self.step_save * t / 200
+        for t in range(0, 600):
+            self.step_value = self.step_save*t/600
             self.searching_distance_loc()
             self.searching_distance_block()
             self.searching_forces_loc()
@@ -279,8 +259,8 @@ class Particle_wsarm:
 def get_data(cl_att_cl, Num_cl, bloks, blok_cl, bl_att_cl):
     import random
     N = np.sum(Num_cl)
-    bl_att_cl[:, :, 0] = bl_att_cl[:, :, 0] * N ** 2
-    # bl_att_cl[0, 1, 2] = bl_att_cl[0, 1, 2] * N
+    bl_att_cl[:, :, 0] = bl_att_cl[:, :, 0] * N**2
+    #bl_att_cl[0, 1, 2] = bl_att_cl[0, 1, 2] * N
     Points_obj = []
     for i in range(N):
         Points_obj.append([random.randrange(22, 32), random.randrange(17, 32)])
@@ -320,7 +300,7 @@ def get_data(cl_att_cl, Num_cl, bloks, blok_cl, bl_att_cl):
 
 if __name__ == "__main__":
     T_barrier = 10
-    T_window_grav = 4
+    T_window_grav = 15
     Num_cl = [15, 16, 17]
     cl_att_cl = np.array([[[15, 0, 3, 4, 15], [5, 0, 1, 10, 65], [5, 0, 1, 13, 60]],
                           [[5, 0, 1, 10, 65], [15, 0, 3, 4, 15], [5, 0, 1, 10, 60]],
@@ -514,9 +494,9 @@ if __name__ == "__main__":
                              [5, 7]
                              ])
     block_cl = [[[50, 70], [72, 74]], [[0, 50], [70, 72], [74, 149]], [[149, Points_block.shape[0]]]]
-    bl_att_cl = np.array([[[T_barrier, 0, T_window_grav, 2, 4], [T_barrier, 0, 0, 2, 4], [T_barrier, 0, 0, 2, 4]],
+    bl_att_cl = np.array([[[T_barrier, 0, 0, 2, 4], [T_barrier, 0, T_window_grav, 2, 4], [T_barrier, 0, 0, 2, 4]],
                           [[T_barrier, 0, 0, 2, 4], [T_barrier, 0, 0, 2, 4], [T_barrier, 0, 0, 2, 4]],
-                          [[T_barrier, 0, 0, 5, 7], [T_barrier, 0, 0, 5, 7], [T_barrier, 0, 0, 5, 7]]
+                          [[T_barrier*2, 0, 0, 5, 7], [T_barrier*2, 0, 0, 5, 7], [T_barrier*2, 0, 0, 5, 7]]
                           ])
 
     Points_obj, Points_block, obj_dist, koef_obj, block_distance, koef_block, indexs_cl = get_data(cl_att_cl, Num_cl,
@@ -529,7 +509,6 @@ if __name__ == "__main__":
     # print(block_distance.shape)
     # print(koef_block)
     step = 0.001
-    P2_w = Particle_wsarm(cl_att_cl, Num_cl, Points_block, block_cl, bl_att_cl)
-    P2_w.process2()
-    # P_w = Particle_wsarm(Points_obj, Points_block, obj_dist, koef_obj, block_distance, koef_block, indexs_cl, step)
-    # P_w.process()
+
+    P_w = Particle_wsarm(Points_obj, Points_block, obj_dist, koef_obj, block_distance, koef_block, indexs_cl, step)
+    P_w.process()
