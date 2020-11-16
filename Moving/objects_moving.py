@@ -14,6 +14,11 @@ class Particle_wsarm:
         self.step_save = step
         self.indexs_cl = indexs_cl
 
+        self.force_loc_max = []
+        self.force_block_max = []
+        self.x_axis = []
+
+
         self.points_obj_x = self.points_obj[:, 0].flatten()
         self.points_obj_y = self.points_obj[:, 1].flatten()
 
@@ -116,10 +121,11 @@ class Particle_wsarm:
         force_grav_max_dist = force_block_3.max()+1
 
         grav_mask = (force_block_3 == 0)*force_grav_max_dist
-        force_block_3 += grav_mask
+
+        force_block_3_copy = force_block_3 + grav_mask
         #print(force_block_3.shape)
 
-        ind_min_dist_grav = np.unravel_index(np.argmin(force_block_3, axis=1), force_block_3.shape)
+        ind_min_dist_grav = np.unravel_index(np.argmin(force_block_3_copy, axis=1), force_block_3_copy.shape)
         #print(ind_min_dist_grav)
         #force_grav_min_dist = force_block_3.min()
         s_mask = np.zeros_like(force_block_3)
@@ -129,6 +135,7 @@ class Particle_wsarm:
         force_block = force_block_1 + force_block_2 + s_mask
         #force_block[ind_min_dist_grav[0], ind_min_dist_grav[1]] += force_grav_min_dist
         self.force_block = force_block
+        print((force_block<0).sum(), (force_block==0).sum(), (force_block>0).sum())
         # print(np.sum(force_block))
         # print(force_block)
         self.force_block_x = force_block * ((self.dist_block_x < 0) * 2 - 1)
@@ -151,6 +158,9 @@ class Particle_wsarm:
 
         self.points_obj_x = self.points_obj_x + self.step_value * (self.force_block_x + self.force_loc_x)*bufer_x_mask
         self.points_obj_y = self.points_obj_y + self.step_value * (self.force_block_y + self.force_loc_y)*bufer_y_mask
+
+        self.force_block_max.append(max(max(self.force_block_x), max(self.force_block_y)))
+        self.force_loc_max.append(max(max(self.force_loc_x), max(self.force_loc_y)))
 
         # print(self.points_obj_x)
 
@@ -193,8 +203,11 @@ class Particle_wsarm:
             block_distance[:, :, :3]), indexs_cl
 
     def process(self):
-        for t in range(0, 600):
+        from matplotlib.legend_handler import HandlerLine2D
+        Bound_step = 0.3
+        for t in range(0, 1000):
             self.step_value = self.step_save*t/600
+            if self.step_value >= self.step_save * Bound_step: self.step_value = self.step_save * Bound_step
             self.searching_distance_loc()
             self.searching_distance_block()
             self.searching_forces_loc()
@@ -203,12 +216,19 @@ class Particle_wsarm:
             # print(self.points_obj_x.shape)
             # print(self.points_obj_y.shape)
             print(t)
+            self.x_axis.append(t)
 
-            fig, ax = plt.subplots()
-            ax.scatter(self.points_block_x, self.points_block_y)
+            fig, ax = plt.subplots(2)
+            ax[1].set_xlim(0, 600)
+            ax[0].scatter(self.points_block_x, self.points_block_y)
             for cl_raw in self.indexs_cl:
-                ax.scatter(self.points_obj_x[cl_raw[0]:cl_raw[1]], self.points_obj_y[cl_raw[0]:cl_raw[1]])
-            fig.savefig(f"band{t}.jpg", dpi=300, bbox_inches='tight', pad_inches=0)
+                ax[0].scatter(self.points_obj_x[cl_raw[0]:cl_raw[1]], self.points_obj_y[cl_raw[0]:cl_raw[1]])
+            ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max")
+            ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max")
+            #ax[1].text(480, 10, t)
+            ax[1].legend()
+
+            fig.savefig(f"Scrins/band{t}.jpg", dpi=300, bbox_inches='tight', pad_inches=0)
             plt.close(fig)
         # plt.show()
 
