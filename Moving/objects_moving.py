@@ -1,29 +1,53 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import progressbar as pb
 
 
 class Particle_wsarm:
-    def __init__(self, Points_obj, Points_block, obj_distance, koef_obj, block_distance, koef_block, indexs_cl, step):
-        self.points_block = Points_block
-        self.points_obj = Points_obj
-        self.obj_distance = obj_distance
-        self.koef_obj = koef_obj
-        self.block_distance = block_distance
-        self.koef_block = koef_block
+    def __init__(self, cl_att_cl, Num_cl, bloks, blok_cl, bl_att_cl, Points_obj, step):
+        self.cl_att_cl = cl_att_cl
+        self.Num_cl = Num_cl
+        self.bloks = bloks
+        self.blok_cl = blok_cl
+        self.bl_att_cl = bl_att_cl
+        self.Points_obj = Points_obj
         self.step_value = step
         self.step_save = step
-        self.indexs_cl = indexs_cl
+        self.Points_obj = np.array(self.Points_obj)
+        self.preparing_data()
 
         self.force_loc_max = []
         self.force_block_max = []
         self.x_axis = []
 
+        self.points_obj_x = self.Points_obj[:, 0].flatten()
+        self.points_obj_y = self.Points_obj[:, 1].flatten()
+        #
+        self.points_block_x = self.bloks[:, 0].flatten()
+        self.points_block_y = self.bloks[:, 1].flatten()
 
-        self.points_obj_x = self.points_obj[:, 0].flatten()
-        self.points_obj_y = self.points_obj[:, 1].flatten()
 
-        self.points_block_x = self.points_block[:, 0].flatten()
-        self.points_block_y = self.points_block[:, 1].flatten()
+    # def __init__(self, Points_obj, Points_block, obj_distance, koef_obj, block_distance, koef_block, indexs_cl, step):
+    #     self.points_block = Points_block
+    #     self.points_obj = Points_obj
+    #     self.obj_distance = obj_distance
+    #     self.koef_obj = koef_obj
+    #     self.block_distance = block_distance
+    #     self.koef_block = koef_block
+    #     self.step_value = step
+    #     self.step_save = step
+    #     self.indexs_cl = indexs_cl
+    #
+    #     self.force_loc_max = []
+    #     self.force_block_max = []
+    #     self.x_axis = []
+    #
+    #
+    #     self.points_obj_x = self.points_obj[:, 0].flatten()
+    #     self.points_obj_y = self.points_obj[:, 1].flatten()
+    #
+    #     self.points_block_x = self.points_block[:, 0].flatten()
+    #     self.points_block_y = self.points_block[:, 1].flatten()
 
     def searching_distance_loc(self):
         self.loc_t_block_x = np.array([self.points_obj_x, ] * self.points_block_x.shape[0])
@@ -135,7 +159,7 @@ class Particle_wsarm:
         force_block = force_block_1 + force_block_2 + s_mask
         #force_block[ind_min_dist_grav[0], ind_min_dist_grav[1]] += force_grav_min_dist
         self.force_block = force_block
-        print((force_block<0).sum(), (force_block==0).sum(), (force_block>0).sum())
+        #print((force_block<0).sum(), (force_block==0).sum(), (force_block>0).sum())
         # print(np.sum(force_block))
         # print(force_block)
         self.force_block_x = force_block * ((self.dist_block_x < 0) * 2 - 1)
@@ -151,62 +175,107 @@ class Particle_wsarm:
         # print(self.force_block_y)
         bufer_x = self.points_obj_x + self.step_value * (self.force_block_x + self.force_loc_x)
         bufer_y = self.points_obj_y + self.step_value * (self.force_block_y + self.force_loc_y)
-        bufer_x_mask = (((bufer_x < 8)*1 + (bufer_x > 52)*1) == 0)*1
-        bufer_y_mask = (((bufer_y < 7) * 1 + (bufer_y > 35) * 1) == 0) * 1
+        bufer_x_mask = (((bufer_x < 8)*1 + (bufer_x > 52)*1) == 0)
+        bufer_y_mask = (((bufer_y < 7) * 1 + (bufer_y > 35) * 1) == 0)
 
+        general_mask = np.logical_and(bufer_y_mask, bufer_x_mask)*1
 
-
-        self.points_obj_x = self.points_obj_x + self.step_value * (self.force_block_x + self.force_loc_x)*bufer_x_mask
-        self.points_obj_y = self.points_obj_y + self.step_value * (self.force_block_y + self.force_loc_y)*bufer_y_mask
+        self.points_obj_x = self.points_obj_x + self.step_value * (self.force_block_x + self.force_loc_x)*general_mask
+        self.points_obj_y = self.points_obj_y + self.step_value * (self.force_block_y + self.force_loc_y)*general_mask
 
         self.force_block_max.append(max(max(self.force_block_x), max(self.force_block_y)))
         self.force_loc_max.append(max(max(self.force_loc_x), max(self.force_loc_y)))
 
         # print(self.points_obj_x)
 
-    def preparing_data(self, cl_att_cl, Num_cl, bloks, blok_cl, bl_att_cl, Points_obj):
+    def preparing_data(self):
         import random
-        N = np.sum(Num_cl)
-        bl_att_cl[:, :, 0] = bl_att_cl[:, :, 0] * N * 2
+        N = np.sum(self.Num_cl)
+        #self.bl_att_cl[:, :, 0] = self.bl_att_cl[:, :, 0] * N
         # bl_att_cl[0, 1, 2] = bl_att_cl[0, 1, 2] * N
 
-        Points_obj = np.array(Points_obj)
+
         addit_count_ = 0
         indexs_cl = []
-        for cl in Num_cl:
+        for cl in self.Num_cl:
             indexs_cl.append([addit_count_, addit_count_ + cl - 1])
             addit_count_ += cl
 
-        print(indexs_cl)
+        #print(indexs_cl)
 
         obj_mask = np.ones((N, N), int)
-        obj_dist = np.repeat(np.repeat(cl_att_cl, Num_cl, axis=0), Num_cl, axis=1)
+        obj_dist = np.repeat(np.repeat(self.cl_att_cl, self.Num_cl, axis=0), self.Num_cl, axis=1)
         np.fill_diagonal(obj_mask, 0)
         obj_mask = obj_mask[:, :, np.newaxis]
         koef_obj = obj_dist[:, :, :3] * obj_mask
         obj_dist = obj_dist[:, :, 3:5] * obj_mask
 
-        block_distance = np.array([[[0, 0, 0, 0, 0], ] * Points_block.shape[0], ] * Points_obj.shape[0])
+        block_distance = np.array([[[0, 0, 0, 0, 0], ] * Points_block.shape[0], ] * self.Points_obj.shape[0])
 
         for i, bl_cl in enumerate(block_cl):
             for case in enumerate(bl_cl):
                 # print(i)
-                for j, val in enumerate(bl_att_cl[i]):
+                for j, val in enumerate(self.bl_att_cl[i]):
                     # print(int(indexs_cl[j][0]), int(indexs_cl[j][1]), int(case[1][0]), int(case[1][1]), val)
-                    block_distance[int(indexs_cl[j][0]):int(indexs_cl[j][1]), int(case[1][0]): int(case[1][1]), :] = val
+                    block_distance[int(indexs_cl[j][0]):int(indexs_cl[j][1]+1), int(case[1][0]): int(case[1][1])+1, :] = val
 
                 # block_distance[]
                 # print(case[0], case[1])
 
         # print(Points_obj)
-        return Points_obj, bloks, obj_dist, koef_obj, np.array(block_distance[:, :, 3:5]), np.array(
-            block_distance[:, :, :3]), indexs_cl
+        self.obj_distance = obj_dist
+        self.koef_obj = koef_obj
+        self.block_distance = block_distance[:, :, 3:5]
+        self.koef_block = block_distance[:, :, :3]
+        self.indexs_cl = indexs_cl
 
-    def process(self):
+
+    def printProgressBar(self, iteration, total, prefix='', suffix='', decimals=1, length=100, fill='█', printEnd="\r"):
+        """
+        Call in a loop to create terminal progress bar
+        @params:
+            iteration   - Required  : current iteration (Int)
+            total       - Required  : total iterations (Int)
+            prefix      - Optional  : prefix string (Str)
+            suffix      - Optional  : suffix string (Str)
+            decimals    - Optional  : positive number of decimals in percent complete (Int)
+            length      - Optional  : character length of bar (Int)
+            fill        - Optional  : bar fill character (Str)
+            printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+        """
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        filledLength = int(length * iteration // total)
+        bar = fill * filledLength + '-' * (length - filledLength)
+        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end=printEnd)
+        # Print New Line on Complete
+        if iteration == total:
+            print()
+
+    def update_progress(self, progress):
+        print('\r[{0}] {1}%'.format('#' * int(progress / 10), progress))
+
+    def process(self, type_draw='end', length = 10000):
+        bar = pb.ProgressBar().start()
         from matplotlib.legend_handler import HandlerLine2D
+        self.cl_att_cl[:, :, 0] = self.cl_att_cl[:, :, 0]/5
+        #self.cl_att_cl[:, :, 0] = self.cl_att_cl[:, :, 0] / 5
+        for raw in range(self.cl_att_cl.shape[0]):
+            self.cl_att_cl[raw, raw, 2] = self.cl_att_cl[raw, raw, 2]*20
+            self.cl_att_cl[raw, raw, 0] = self.cl_att_cl[raw, raw, 0] * 20
+        self.preparing_data()
+
         Bound_step = 0.3
-        for t in range(0, 1000):
-            self.step_value = self.step_save*t/600
+        for t in range(0, length):
+            if t == int(length/2):
+                for raw in range(self.cl_att_cl.shape[0]):
+                    self.cl_att_cl[raw, raw, 2] = self.cl_att_cl[raw, raw, 2] / 20
+                    self.cl_att_cl[raw, raw, 0] = self.cl_att_cl[raw, raw, 0] / 20
+                self.cl_att_cl[:, :, 0] = self.cl_att_cl[:, :, 0] *20
+                self.preparing_data()
+
+
+
+            self.step_value = self.step_save*t/length
             if self.step_value >= self.step_save * Bound_step: self.step_value = self.step_save * Bound_step
             self.searching_distance_loc()
             self.searching_distance_block()
@@ -215,22 +284,45 @@ class Particle_wsarm:
             self.step()
             # print(self.points_obj_x.shape)
             # print(self.points_obj_y.shape)
-            print(t)
+            #self.printProgressBar(t, 1000, prefix='Progress: ', suffix='Complete')
+            #print(t)
+            #self.update_progress(t/1000)
+            bar.update(t*100/length)
             self.x_axis.append(t)
 
-            fig, ax = plt.subplots(2)
-            ax[1].set_xlim(0, 600)
-            ax[0].scatter(self.points_block_x, self.points_block_y)
-            for cl_raw in self.indexs_cl:
-                ax[0].scatter(self.points_obj_x[cl_raw[0]:cl_raw[1]], self.points_obj_y[cl_raw[0]:cl_raw[1]])
-            ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max")
-            ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max")
-            #ax[1].text(480, 10, t)
-            ax[1].legend()
+            if type_draw == 'all':
+                fig, ax = plt.subplots(2)
+                ax[1].set_xlim(0, length)
+                ax[0].scatter(self.points_block_x, self.points_block_y)
+                for cl_raw in self.indexs_cl:
+                    ax[0].scatter(self.points_obj_x[cl_raw[0]:cl_raw[1]], self.points_obj_y[cl_raw[0]:cl_raw[1]])
+                ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max")
+                ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max")
+                #ax[1].text(480, 10, t)
+                ax[1].legend()
 
-            fig.savefig(f"Scrins/band{t}.jpg", dpi=300, bbox_inches='tight', pad_inches=0)
-            plt.close(fig)
+                fig.savefig(f"Scrins/band{t}.jpg", dpi=300, bbox_inches='tight', pad_inches=0)
+                plt.close(fig)
+
+            if type_draw == 'end':
+                if t == length - 1:
+                    fig, ax = plt.subplots(2)
+                    ax[1].set_xlim(0, length)
+                    ax[0].scatter(self.points_block_x, self.points_block_y)
+                    for cl_raw in self.indexs_cl:
+                        ax[0].scatter(self.points_obj_x[cl_raw[0]:cl_raw[1]+1], self.points_obj_y[cl_raw[0]:cl_raw[1]+1])
+                    ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max")
+                    ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max")
+                    # ax[1].text(480, 10, t)
+                    ax[1].legend()
+
+                    fig.savefig(f"Result.jpg", dpi=300, bbox_inches='tight', pad_inches=0)
+                    plt.close(fig)
+
+
         # plt.show()
+
+        bar.finish()
 
     def micro_process(self):
         for t in range(0, 200):
@@ -529,6 +621,6 @@ if __name__ == "__main__":
     # print(block_distance.shape)
     # print(koef_block)
     step = 0.001
-
-    P_w = Particle_wsarm(Points_obj, Points_block, obj_dist, koef_obj, block_distance, koef_block, indexs_cl, step)
+    P_w = Particle_wsarm(cl_att_cl, Num_cl, Points_block, block_cl, bl_att_cl, Points_obj, step)
+    #P_w = Particle_wsarm(Points_obj, Points_block, obj_dist, koef_obj, block_distance, koef_block, indexs_cl, step)
     P_w.process()
