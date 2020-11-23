@@ -253,7 +253,7 @@ class Particle_wsarm:
     def update_progress(self, progress):
         print('\r[{0}] {1}%'.format('#' * int(progress / 10), progress))
 
-    def process(self, type_draw='end', length=5000):
+    def process(self, type_draw='all', length=3000):
         bar = pb.ProgressBar().start()
         gif_time = 30000
         from matplotlib.legend_handler import HandlerLine2D
@@ -266,12 +266,21 @@ class Particle_wsarm:
 
         Bound_step = 0.3
         for t in range(0, length):
-            if t == int(length / 2):
+            if t == int(length*0.6):
                 for raw in range(self.cl_att_cl.shape[0]):
                     self.cl_att_cl[raw, raw, 2] = self.cl_att_cl[raw, raw, 2] / 20
                     self.cl_att_cl[raw, raw, 0] = self.cl_att_cl[raw, raw, 0] / 20
                 self.cl_att_cl[:, :, 0] = self.cl_att_cl[:, :, 0] * 20
                 self.preparing_data()
+
+            if t == int(length*0.75):
+                for raw in range(self.cl_att_cl.shape[0]):
+                    self.cl_att_cl[raw, raw, 2] = 0
+                    #self.cl_att_cl[raw, raw, 3] = self.cl_att_cl[raw, raw, 3] + 10
+                max_gravity_block = np.amax(self.bl_att_cl[:, :, 2])
+                self.bl_att_cl[1, :, 2] = max_gravity_block * 5
+                self.preparing_data()
+
 
             self.step_value = self.step_save * t / length
             if self.step_value >= self.step_save * Bound_step: self.step_value = self.step_save * Bound_step
@@ -317,13 +326,14 @@ class Particle_wsarm:
                 # ax[1].text(480, 10, t)
                 ax[1].legend()
 
-                fig.savefig(f"Scrins/band{t}.jpg", dpi=300, bbox_inches='tight', pad_inches=0)
+                fig.savefig(f"Scrins/band{t}.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
                 plt.close(fig)
 
             if type_draw == 'end':
                 if t == length - 1:
                     fig, ax = plt.subplots(2)
                     ax[1].set_xlim(0, length)
+                    ax[1].set_ylim(0, 21000)
                     for i, bl_cl in enumerate(self.blok_cl):
                         color_set = 'b'
                         if i == 1:
@@ -349,7 +359,7 @@ class Particle_wsarm:
                     # ax[1].text(480, 10, t)
                     ax[1].legend()
 
-                    fig.savefig(f"Result.jpg", dpi=300, bbox_inches='tight', pad_inches=0)
+                    fig.savefig(f"Result.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
                     plt.close(fig)
 
         # plt.show()
@@ -357,7 +367,7 @@ class Particle_wsarm:
         bar.finish()
         if type_draw == 'all':
             print('Udate Images')
-            names = [f"Scrins/band{band}.jpg" for band in range(0, length)]
+            names = [f"Scrins/band{band}.jpg" for band in range(0, length, 10)]
             images = [Image.open(f) for f in names]
             images = [image.convert("P", palette=Image.ADAPTIVE) for image in images]
             fp_out = "image.gif"
@@ -650,7 +660,7 @@ if __name__ == "__main__":
                              ])
     block_cl = [[[50, 70], [72, 74]], [[0, 50], [70, 72], [74, 149]], [[149, Points_block.shape[0]]]]
     bl_att_cl = np.array([[[T_barrier, 0, 0, 2, 4], [T_barrier, 0, T_window_grav, 2, 4], [T_barrier, 0, 0, 2, 4]],
-                          [[T_barrier, 0, 0, 2, 4], [T_barrier, 0, 0, 2, 4], [T_barrier, 0, 0, 2, 4]],
+                          [[T_barrier, 0, 0, 2, 4], [T_barrier, 0, 0, 1, 4], [T_barrier, 0, 0, 2, 4]],
                           [[T_barrier * 2, 0, 0, 5, 7], [T_barrier * 2, 0, 0, 5, 7], [T_barrier * 2, 0, 0, 5, 7]]
                           ])
 
