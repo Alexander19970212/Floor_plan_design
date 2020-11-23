@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import progressbar as pb
+from PIL import Image
 
 
 class Particle_wsarm:
@@ -254,6 +255,7 @@ class Particle_wsarm:
 
     def process(self, type_draw='end', length=5000):
         bar = pb.ProgressBar().start()
+        gif_time = 30000
         from matplotlib.legend_handler import HandlerLine2D
         self.cl_att_cl[:, :, 0] = self.cl_att_cl[:, :, 0] / 5
         # self.cl_att_cl[:, :, 0] = self.cl_att_cl[:, :, 0] / 5
@@ -287,36 +289,36 @@ class Particle_wsarm:
             self.x_axis.append(t)
 
             if type_draw == 'all':
-                if t == length - 1:
-                    fig, ax = plt.subplots(2)
-                    ax[1].set_xlim(0, length)
-                    for i, bl_cl in enumerate(self.blok_cl):
-                        color_set = 'b'
-                        if i == 1:
-                            color_set = 'k'
-                        elif i == 2:
-                            color_set = 'c'
-                        for cs in bl_cl:
-                            ax[0].scatter(self.points_block_x[cs[0]:cs[1]], self.points_block_y[cs[0]:cs[1]],
-                                          color=color_set)
 
-                    # ax[0].scatter(self.points_block_x, self.points_block_y)
-                    for i, cl_raw in enumerate(self.indexs_cl):
-                        color_set = 'y'
-                        if i == 1:
-                            color_set = 'g'
-                        elif i == 2:
-                            color_set = 'r'
-                        ax[0].scatter(self.points_obj_x[cl_raw[0]:cl_raw[1] + 1],
-                                      self.points_obj_y[cl_raw[0]:cl_raw[1] + 1], color=color_set)
-                    ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max", color='g')
-                    ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max", color='r')
+                fig, ax = plt.subplots(2)
+                ax[1].set_xlim(0, length)
+                for i, bl_cl in enumerate(self.blok_cl):
+                    color_set = 'b'
+                    if i == 1:
+                        color_set = 'k'
+                    elif i == 2:
+                        color_set = 'c'
+                    for cs in bl_cl:
+                        ax[0].scatter(self.points_block_x[cs[0]:cs[1]], self.points_block_y[cs[0]:cs[1]],
+                                      color=color_set)
 
-                    # ax[1].text(480, 10, t)
-                    ax[1].legend()
+                # ax[0].scatter(self.points_block_x, self.points_block_y)
+                for i, cl_raw in enumerate(self.indexs_cl):
+                    color_set = 'y'
+                    if i == 1:
+                        color_set = 'g'
+                    elif i == 2:
+                        color_set = 'r'
+                    ax[0].scatter(self.points_obj_x[cl_raw[0]:cl_raw[1] + 1],
+                                  self.points_obj_y[cl_raw[0]:cl_raw[1] + 1], color=color_set)
+                ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max", color='g')
+                ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max", color='r')
 
-                    fig.savefig(f"/Scrins/band{}.jpg", dpi=300, bbox_inches='tight', pad_inches=0)
-                    plt.close(fig)
+                # ax[1].text(480, 10, t)
+                ax[1].legend()
+
+                fig.savefig(f"Scrins/band{t}.jpg", dpi=300, bbox_inches='tight', pad_inches=0)
+                plt.close(fig)
 
             if type_draw == 'end':
                 if t == length - 1:
@@ -353,6 +355,17 @@ class Particle_wsarm:
         # plt.show()
 
         bar.finish()
+        if type_draw == 'all':
+            print('Udate Images')
+            names = [f"Scrins/band{band}.jpg" for band in range(0, length)]
+            images = [Image.open(f) for f in names]
+            images = [image.convert("P", palette=Image.ADAPTIVE) for image in images]
+            fp_out = "image.gif"
+            print('Creating GIF')
+
+            img = images[0]
+            img.save(fp=fp_out, format="GIF", append_images=images[1:], save_all=True, duration=int(gif_time / length),
+                     loop=0)
 
     def micro_process(self):
         for t in range(0, 200):
