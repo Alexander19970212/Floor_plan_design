@@ -253,7 +253,7 @@ class Particle_wsarm:
     def update_progress(self, progress):
         print('\r[{0}] {1}%'.format('#' * int(progress / 10), progress))
 
-    def process(self, type_draw='all', length=3000):
+    def process(self, type_draw='end', length=3000):
         bar = pb.ProgressBar().start()
         gif_time = 30000
         from matplotlib.legend_handler import HandlerLine2D
