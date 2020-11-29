@@ -266,21 +266,20 @@ class Particle_wsarm:
 
         Bound_step = 0.3
         for t in range(0, length):
-            if t == int(length*0.6):
+            if t == int(length * 0.6):
                 for raw in range(self.cl_att_cl.shape[0]):
                     self.cl_att_cl[raw, raw, 2] = self.cl_att_cl[raw, raw, 2] / 20
                     self.cl_att_cl[raw, raw, 0] = self.cl_att_cl[raw, raw, 0] / 20
                 self.cl_att_cl[:, :, 0] = self.cl_att_cl[:, :, 0] * 20
                 self.preparing_data()
 
-            if t == int(length*0.75):
+            if t == int(length * 0.75):
                 for raw in range(self.cl_att_cl.shape[0]):
                     self.cl_att_cl[raw, raw, 2] = 0
-                    #self.cl_att_cl[raw, raw, 3] = self.cl_att_cl[raw, raw, 3] + 10
+                    # self.cl_att_cl[raw, raw, 3] = self.cl_att_cl[raw, raw, 3] + 10
                 max_gravity_block = np.amax(self.bl_att_cl[:, :, 2])
                 self.bl_att_cl[1, :, 2] = max_gravity_block * 5
                 self.preparing_data()
-
 
             self.step_value = self.step_save * t / length
             if self.step_value >= self.step_save * Bound_step: self.step_value = self.step_save * Bound_step
@@ -419,6 +418,120 @@ class Particle_wsarm:
             self.intialize(Points_obj, Points_block, obj_dist, koef_obj, block_distance, koef_block, indexs_cl,
                            step)
             self.micro_process()
+
+
+class Corridors:
+    def __init__(self, x_obj, y_obj, cl_att_cl, Num_cl, x_doors, y_doors):
+        import networkx as nx
+        self.G = nx.Graph()
+
+
+        self.x_obj = x_obj
+        self.y_obj = y_obj
+        self.cl_att_cl = cl_att_cl
+        self.Num_cl = Num_cl
+        self.x_doors = x_doors
+        self.y_doors = y_doors
+
+    def find_ar_point(self):
+        qu_obj_x = np.array([self.x_obj, ] * self.x_obj.shape[0])
+        qu_obj_y = np.array([self.y_obj, ] * self.y_obj.shape[0])
+        np.fill_diagonal(qu_obj_x, 0)
+        np.fill_diagonal(qu_obj_y, 0)
+        x_arr = qu_obj_x - (qu_obj_x.transpose() - qu_obj_x) / 2
+        y_arr = qu_obj_y - (qu_obj_y.transpose() - qu_obj_y) / 2
+
+        x_arr_list = []
+        y_arr_list = []
+
+        for raw in range(0, self.x_obj.shape[0]-1):
+            for colomn in range(raw+1, self.x_obj.shape[0]):
+                x_arr_list.append(x_arr[raw, colomn])
+                y_arr_list.append(y_arr[raw, colomn])
+
+        self.x_arr = np.array(x_arr_list)
+        self.y_arr = np.array(y_arr_list)
+
+    def between_class_mask(self):
+        pr_mask = np.eye(len(self.Num_cl))
+        obj_dist = np.repeat(np.repeat(pr_mask, self.Num_cl, axis=0), self.Num_cl, axis=1)
+        np.fill_diagonal(obj_dist, 0)
+
+        mask_between_class = []
+
+        for raw in range(0, self.x_obj.shape[0]-1):
+            for colomn in range(raw+1, self.x_obj.shape[0]):
+                mask_between_class.append(obj_dist[raw, colomn])
+
+
+        self.mask_bt_cl = np.array(mask_between_class)
+
+    def find_dist_obj(self):
+        qu_obj_x = np.array([self.x_obj, ] * self.x_obj.shape[0])
+        qu_obj_y = np.array([self.y_obj, ] * self.y_obj.shape[0])
+        np.fill_diagonal(qu_obj_x, 0)
+        np.fill_diagonal(qu_obj_y, 0)
+
+        pr_d_x = qu_obj_x - qu_obj_x.transpose()
+        pr_d_y= qu_obj_y - qu_obj_y.transpose()
+
+        np.array(pr_d_x)
+        np.array(pr_d_y)
+
+        w_dist = pr_d_x + pr_d_y
+        pr_dist_list = []
+
+        for raw in range(0, self.x_obj.shape[0]-1):
+            for colomn in range(raw+1, self.x_obj.shape[0]):
+                pr_dist_list.append(w_dist[raw, colomn])
+
+
+        self.w_dist = np.array(w_dist)
+
+    def add_points(self):
+        pass
+
+    def find_dist_ar_p(self):
+        qu_obj_x = np.array([self.x_arr, ] * self.x_arr.shape[0])
+        qu_obj_y = np.array([self.y_arr, ] * self.y_arr.shape[0])
+        np.fill_diagonal(qu_obj_x, 0)
+        np.fill_diagonal(qu_obj_y, 0)
+
+        pr_d_x = qu_obj_x - qu_obj_x.transpose()
+        pr_d_y= qu_obj_y - qu_obj_y.transpose()
+
+        np.array(pr_d_x)
+        np.array(pr_d_y)
+
+        self.w_dist_bw = np.sqrt(pr_d_x + pr_d_y)
+
+    def summing_w(self):
+        bcl_mask = np.array([self.mask_bt_cl, ] * self.mask_bt_cl.shape[0])*10
+        first_dist = np.array([self.w_dist, ] * self.w_dist.shape[0])
+        self.weights = bcl_mask + first_dist + self.w_dist_bw
+
+    def exception_weight(self):
+        max_dist = np.max(self.w_dist_bw)
+        self.indexs = np.where(self.w_dist_bw <= max_dist*0.3)
+
+    def set_graph(self):
+        nodes = np.array(np.arange(0, self.x_arr.shape[0]))
+        self.G.add_nodes_from(nodes)
+        for edge in self.indexs:
+            self.G.add_edge(edge[0], edge[1], {'weight': self.weights[edge[0], edge[1]]})
+
+    def shortest_path(self):
+        pass
+
+
+
+
+
+
+
+
+
+
 
 
 def get_data(cl_att_cl, Num_cl, bloks, blok_cl, bl_att_cl):
