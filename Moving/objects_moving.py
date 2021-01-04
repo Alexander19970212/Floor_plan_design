@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import progressbar as pb
+import networkx as nx  # import module for founding the shortest path
 from PIL import Image
 
 
@@ -419,6 +420,39 @@ class Particle_wsarm:
                            step)
             self.micro_process()
 
+    def show_short_path(self, x_path, y_path, length=3000):
+        fig, ax = plt.subplots(2)
+        ax[1].set_xlim(0, length)
+        ax[1].set_ylim(0, 21000)
+        for i, bl_cl in enumerate(self.blok_cl):
+            color_set = 'b'
+            if i == 1:
+                color_set = 'k'
+            elif i == 2:
+                color_set = 'c'
+            for cs in bl_cl:
+                ax[0].scatter(self.points_block_x[cs[0]:cs[1]], self.points_block_y[cs[0]:cs[1]],
+                              color=color_set)
+
+        # ax[0].scatter(self.points_block_x, self.points_block_y)
+        for i, cl_raw in enumerate(self.indexs_cl):
+            color_set = 'y'
+            if i == 1:
+                color_set = 'g'
+            elif i == 2:
+                color_set = 'r'
+            ax[0].scatter(self.points_obj_x[cl_raw[0]:cl_raw[1] + 1],
+                          self.points_obj_y[cl_raw[0]:cl_raw[1] + 1], color=color_set)
+        ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max", color='g')
+        ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max", color='r')
+
+        ax[0].plot(x_path, y_path)
+
+        # ax[1].text(480, 10, t)
+        ax[1].legend()
+
+        fig.savefig(f"Result_short_path.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
 
 class Corridors:
     '''
@@ -440,7 +474,7 @@ class Corridors:
         :param x_doors: vector x of drops for connection;
         :param y_doors: vector y of drops for connection;
         '''
-        import networkx as nx  # import modul for founding the shortest path
+
         self.G = nx.Graph()  # inition of Graph
 
         self.x_obj = x_obj  # inition of input data
@@ -449,6 +483,16 @@ class Corridors:
         self.Num_cl = Num_cl
         self.x_doors = x_doors
         self.y_doors = y_doors
+
+        self.x_arr = []
+        self.y_arr = []
+        self.w_dist = []
+        self.qu_w_dist = []
+        self.qu_mask_bt_cl = []
+        self.mask_bt_cl = []
+        self.w_dist_bw = []
+        self.weights = []
+        self.indexes = []
 
     def find_ar_point(self):
         '''
@@ -459,7 +503,7 @@ class Corridors:
         np.fill_diagonal(qu_obj_x, 0)  # removing diagonal elements from x matrix
         np.fill_diagonal(qu_obj_y, 0)  # removing diagonal elements from y matrix
 
-        # FOR DEBUGING: signs maight be changed
+        # FOR DEBUGING: signs might be changed
         x_arr = qu_obj_x - (qu_obj_x.transpose() - qu_obj_x) / 2  # founding average points x
         y_arr = qu_obj_y - (qu_obj_y.transpose() - qu_obj_y) / 2  # founding average points y
 
@@ -480,13 +524,13 @@ class Corridors:
         self.y_arr = np.array(y_arr_list)  # adding y list into class
 
     def between_class_mask(self):
-        '''
+        """
         Function founds attention between drops: if points are in one class, value will be 1, otherwise - 0
-        '''
+        """
         pr_mask = np.eye(len(self.Num_cl))  # creating matrix with 1 in diagonal indexes
-        obj_dist = np.repeat(np.repeat(pr_mask, self.Num_cl, axis=0), self.Num_cl, axis=1)  # expanding one-matrix
+        qu_pr_mask = np.repeat(np.repeat(pr_mask, self.Num_cl, axis=0), self.Num_cl, axis=1)  # expanding one-matrix
         # to like attention between drops matrix
-        np.fill_diagonal(obj_dist, 0)  # removing elements from diagonal
+        np.fill_diagonal(qu_pr_mask, 0)  # removing elements from diagonal
 
         mask_between_class = []  # void list for saving attention between drops
 
@@ -494,17 +538,22 @@ class Corridors:
         Attention between points matrix are transformed to list as the elements above diagonal 
         '''
 
-        # FOR DEBUGING: Points could be lost due to offset
+        # FOR DEBUGGING: Points could be lost due to offset
         for raw in range(0, self.x_obj.shape[0] - 1):
-            for colomn in range(raw + 1, self.x_obj.shape[0]):
-                mask_between_class.append(obj_dist[raw, colomn])  # adding 0 or 1 into attention list
+            for column in range(raw + 1, self.x_obj.shape[0]):
+                mask_between_class.append(qu_pr_mask[raw, column])  # adding 0 or 1 into attention list
 
         self.mask_bt_cl = np.array(mask_between_class)  # saving attention list
 
+        qu_mask_bt_cl = np.array([self.mask_bt_cl, ] * self.mask_bt_cl.shape[0])  # transforming attention list to sq_m
+        np.fill_diagonal(qu_mask_bt_cl, 0)  # removing elements from diagonal
+
+        self.qu_mask_bt_cl = qu_mask_bt_cl  # saving weights
+
     def find_dist_obj(self):
-        '''
+        """
         Function founds weights of average points as the distant between drops.
-        '''
+        """
         qu_obj_x = np.array([self.x_obj, ] * self.x_obj.shape[0])  # transforming vec x to square matrix
         qu_obj_y = np.array([self.y_obj, ] * self.y_obj.shape[0])  # transforming vec y to square matrix
         np.fill_diagonal(qu_obj_x, 0)  # removing diagonal elements from x matrix
@@ -513,8 +562,8 @@ class Corridors:
         pr_d_x = qu_obj_x - qu_obj_x.transpose()  # founding x distant matrix
         pr_d_y = qu_obj_y - qu_obj_y.transpose()  # founding y distant matrix
 
-        # FOR DEBUGING: Posibility to find distant as square root of sum square
-        w_dist = pr_d_x + pr_d_y  # common distant
+        # FOR DEBUGGING: Possibility to find distant as square root of sum square
+        w_dist = np.sqrt(np.square(pr_d_x) + np.square(pr_d_y))  # common distant
 
         '''
         Average points matrix are transformed to list as the elements above diagonal 
@@ -522,18 +571,41 @@ class Corridors:
         pr_dist_list = []  # void list for weights
 
         for raw in range(0, self.x_obj.shape[0] - 1):
-            for colomn in range(raw + 1, self.x_obj.shape[0]):
-                pr_dist_list.append(w_dist[raw, colomn])
+            for column in range(raw + 1, self.x_obj.shape[0]):
+                pr_dist_list.append(w_dist[raw, column])
 
-        self.w_dist = np.array(pr_dist_list)  # saving dastant list
+        self.w_dist = np.array(pr_dist_list)  # saving distant list
+
+        qu_w_dist = np.array([self.w_dist, ] * self.w_dist.shape[0])  # transforming distant list to square matrix
+        np.fill_diagonal(qu_w_dist, 0)  # removing diagonal elements
+
+        self.qu_w_dist = qu_w_dist  # saving weight distant matrix
 
     def add_points(self):
-        pass
+        """
+        The function adds points for connection as new drops.
+        That have to be used after using function for founding weights (find_dist_obj, between_class_mask), but before
+        (find_dist_ar_p).
+        Otherwise the find_dist_ar_p have to be recalculated.
+        """
+        self.x_arr = np.append(self.x_arr, self.x_doors)  # Adding x of doors
+        self.y_arr = np.append(self.y_arr, self.y_doors)  # Adding y of doors
+
+        qu_w_dist_zeros = np.zeros(
+            [self.x_arr.shape[0], self.x_arr.shape[0]])  # creating the zero matrix size with new points
+        qu_mask_bt_cl_zeros = np.zeros([self.x_arr.shape[0], self.x_arr.shape[0]])
+
+        qu_w_dist_zeros[:self.qu_w_dist.shape[0], :self.qu_w_dist.shape[1]] = self.qu_w_dist  # coping the old result
+        # into expended matrix
+        qu_mask_bt_cl_zeros[:self.qu_mask_bt_cl.shape[0], :self.qu_mask_bt_cl.shape[1]] = self.qu_mask_bt_cl
+
+        self.qu_mask_bt_cl = qu_mask_bt_cl_zeros  # saving the matrix of attention weights
+        self.qu_w_dist = qu_w_dist_zeros  # saving the matrix of distant weights
 
     def find_dist_ar_p(self):
-        '''
+        """
         Function founds weights of average points as the distant between average points.
-        '''
+        """
         qu_obj_x = np.array([self.x_arr, ] * self.x_arr.shape[0])  # transforming vec average x to square matrix
         qu_obj_y = np.array([self.y_arr, ] * self.y_arr.shape[0])  # transforming vec average y to square matrix
         np.fill_diagonal(qu_obj_x, 0)  # removing diagonal elements from x matrix
@@ -543,34 +615,58 @@ class Corridors:
         pr_d_y = qu_obj_y - qu_obj_y.transpose()  # founding y distant matrix
 
         # FOR DEBUGGING: Distant between points could be saved as list
-        # FOR DEBUGGING: The arguments of next function could be sum of squares
-        self.w_dist_bw = np.sqrt(pr_d_x + pr_d_y)  # Getting and saving the distant between points
+        self.w_dist_bw = np.sqrt(np.square(pr_d_x) + np.square(pr_d_y))  # Getting and saving the distant between points
 
-    def summing_w(self):
-        '''
+    def summing_w(self, k_w_dist=1, k_mask_bt_cl=10, k_dist_bw=1):
+        """
         Function sums the weights (distant between average points, distant between drops, attention between drops)
-        '''
+        """
         # FOR DEBUGGING: The coefficient have to be rejected
-        bcl_mask = np.array([self.mask_bt_cl, ] * self.mask_bt_cl.shape[0]) * 10  # Transforming list to square matrix
-        first_dist = np.array([self.w_dist, ] * self.w_dist.shape[0])
-        self.weights = bcl_mask + first_dist + self.w_dist_bw  # Summing weights
+        self.weights = self.qu_w_dist * k_w_dist + self.qu_mask_bt_cl * k_mask_bt_cl \
+                       + self.w_dist_bw * k_dist_bw  # Summing weights
 
-    def exception_weight(self):
-        '''
-        Function founds the points where distant less then threshold
-        '''
+    def exception_weight(self, thr=0.15):
+        """
+        Function founds the points where the distant between points less then threshold
+        """
         # FOR DEBUGGING: The threshold have to be rejected
         max_dist = np.max(self.w_dist_bw)  # Founding the maximal distant
-        self.indexs = np.where(self.w_dist_bw <= max_dist * 0.3)  # Founding the indexes less then threshold
+        self.indexes = np.argwhere(self.w_dist_bw <= max_dist * thr)  # Founding the indexes less then threshold
 
     def set_graph(self):
-        nodes = np.array(np.arange(0, self.x_arr.shape[0]))
-        self.G.add_nodes_from(nodes)
-        for edge in self.indexs:
-            self.G.add_edge(edge[0], edge[1], {'weight': self.weights[edge[0], edge[1]]})
+        """
+        Function fill graph
+        """
+        nodes = np.array(np.arange(0, self.x_arr.shape[0]))  # Creating range list for nodes names
+        self.G.add_nodes_from(nodes)  # Initialling the nodes of graph
+        for edge in self.indexes:
+            if edge[0] == edge[1]:  # exception diagonal points
+                continue
+            self.G.add_edge(edge[0], edge[1], weight=self.weights[edge[0], edge[1]])  # Adding edge weights
 
     def shortest_path(self):
-        pass
+        """
+        The function finds the shortest path between two last points
+        """
+        path = nx.shortest_path(self.G, source=self.x_arr.shape[0] - 2, target=self.x_arr.shape[0] - 1, weight='weight')
+        path_x = self.x_arr[path]
+        path_y = self.y_arr[path]
+        return path_x, path_y
+
+    def first_test(self):
+        """
+        The function tests all functions
+        """
+        self.find_ar_point()
+        self.between_class_mask()
+        self.find_dist_obj()
+        self.add_points()
+        self.find_dist_ar_p()
+        self.summing_w()
+        self.exception_weight()
+        self.set_graph()
+        path_x, path_y = self.shortest_path()
+        return path_x, path_y
 
 
 def get_data(cl_att_cl, Num_cl, bloks, blok_cl, bl_att_cl):
@@ -829,3 +925,8 @@ if __name__ == "__main__":
     P_w = Particle_wsarm(cl_att_cl, Num_cl, Points_block, block_cl, bl_att_cl, Points_obj, step)
     # P_w = Particle_wsarm(Points_obj, Points_block, obj_dist, koef_obj, block_distance, koef_block, indexs_cl, step)
     P_w.process()
+    current_x_obj = P_w.points_obj_x
+    current_y_obj = P_w.points_obj_y
+    P_corridors = Corridors(current_x_obj, current_y_obj, cl_att_cl, Num_cl, [52, 7], [31, 22])
+    result_path_x, result_path_y = P_corridors.first_test()
+    P_w.show_short_path(result_path_x, result_path_y)
