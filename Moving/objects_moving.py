@@ -446,13 +446,15 @@ class Particle_wsarm:
         ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max", color='g')
         ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max", color='r')
 
-        ax[0].plot(x_path, y_path)
+        for x_p, y_p in zip(x_path, y_path):
+            ax[0].plot(x_p, y_p)
 
         # ax[1].text(480, 10, t)
         ax[1].legend()
 
-        fig.savefig(f"Result_short_path.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
+        fig.savefig(f"Result_short_path_2.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
         plt.close(fig)
+
 
 class Corridors:
     '''
@@ -481,8 +483,8 @@ class Corridors:
         self.y_obj = y_obj
         self.cl_att_cl = cl_att_cl
         self.Num_cl = Num_cl
-        self.x_doors = x_doors
-        self.y_doors = y_doors
+        self.x_doors = np.array(x_doors)
+        self.y_doors = np.array(y_doors)
 
         self.x_arr = []
         self.y_arr = []
@@ -504,8 +506,8 @@ class Corridors:
         np.fill_diagonal(qu_obj_y, 0)  # removing diagonal elements from y matrix
 
         # FOR DEBUGING: signs might be changed
-        x_arr = qu_obj_x - (qu_obj_x.transpose() - qu_obj_x) / 2  # founding average points x
-        y_arr = qu_obj_y - (qu_obj_y.transpose() - qu_obj_y) / 2  # founding average points y
+        x_arr = qu_obj_x + (qu_obj_x.transpose() - qu_obj_x) / 2  # founding average points x
+        y_arr = qu_obj_y + (qu_obj_y.transpose() - qu_obj_y) / 2  # founding average points y
 
         '''
         Average points matrix are transformed to list as the elements above diagonal 
@@ -625,7 +627,7 @@ class Corridors:
         self.weights = self.qu_w_dist * k_w_dist + self.qu_mask_bt_cl * k_mask_bt_cl \
                        + self.w_dist_bw * k_dist_bw  # Summing weights
 
-    def exception_weight(self, thr=0.15):
+    def exception_weight(self, thr=0.2):
         """
         Function founds the points where the distant between points less then threshold
         """
@@ -644,14 +646,15 @@ class Corridors:
                 continue
             self.G.add_edge(edge[0], edge[1], weight=self.weights[edge[0], edge[1]])  # Adding edge weights
 
-    def shortest_path(self):
+    def shortest_path(self, source_door, target_door):
         """
         The function finds the shortest path between two last points
         """
-        path = nx.shortest_path(self.G, source=self.x_arr.shape[0] - 2, target=self.x_arr.shape[0] - 1, weight='weight')
+        path = nx.shortest_path(self.G, source=self.x_arr.shape[0] - source_door - 1,
+                                target=self.x_arr.shape[0] - target_door - 1, weight='weight')
         path_x = self.x_arr[path]
         path_y = self.y_arr[path]
-        return path_x, path_y
+        return path_x, path_y, path
 
     def first_test(self):
         """
@@ -665,8 +668,49 @@ class Corridors:
         self.summing_w()
         self.exception_weight()
         self.set_graph()
-        path_x, path_y = self.shortest_path()
-        return path_x, path_y
+        s = (self.x_doors.shape[0], self.x_doors.shape[0])
+        print(s)
+        pathes_x = []
+        pathes_y = []
+        pathes = np.array([])
+        accountant_doors = np.arange(0, self.x_doors.shape[0])
+        matrix_short_pathes = np.zeros(s)
+        for i in range(self.x_doors.shape[0]):
+            for j in range(self.x_doors.shape[0]):
+                if i != j:
+                    # path_x, path_y = self.shortest_path(i, j)
+                    matrix_short_pathes[i, j] = nx.shortest_path_length(self.G, source=self.x_arr.shape[0] - i - 1,
+                                                                        target=self.x_arr.shape[0] - j - 1,
+                                                                        weight='weight')
+
+        print(matrix_short_pathes)
+        i, j = np.unravel_index(matrix_short_pathes.argmax(), matrix_short_pathes.shape)
+        print(i, j)
+        path_x, path_y, path = self.shortest_path(i, j)
+        pathes = np.append(pathes, path)
+        pathes_x.append(path_x)
+        pathes_y.append(path_y)
+        accountant_doors = accountant_doors[(accountant_doors != i) & (accountant_doors != j)]
+        for point in accountant_doors:
+            lengthes = np.array([])
+            for node in pathes:
+                length = nx.shortest_path_length(self.G, source=self.x_arr.shape[0] - point - 1, target=node,
+                                                 weight='weight')
+                lengthes = np.append(lengthes, length)
+            print('Pathes', pathes)
+            print('Leghtes', lengthes)
+            n_nodes = np.unravel_index(lengthes.argmin(), lengthes.shape)
+            n_nodes = pathes[n_nodes]
+            path = nx.shortest_path(self.G, source=self.x_arr.shape[0] - point - 1,
+                                    target=n_nodes, weight='weight')
+            path_x = self.x_arr[path]
+            path_y = self.y_arr[path]
+            np.append(pathes, path)
+            pathes_x.append(path_x)
+            pathes_y.append(path_y)
+
+        print(pathes_x)
+        return pathes_x, pathes_y
 
 
 def get_data(cl_att_cl, Num_cl, bloks, blok_cl, bl_att_cl):
@@ -927,6 +971,6 @@ if __name__ == "__main__":
     P_w.process()
     current_x_obj = P_w.points_obj_x
     current_y_obj = P_w.points_obj_y
-    P_corridors = Corridors(current_x_obj, current_y_obj, cl_att_cl, Num_cl, [52, 7], [31, 22])
+    P_corridors = Corridors(current_x_obj, current_y_obj, cl_att_cl, Num_cl, [52, 8, 35], [31, 22, 10])
     result_path_x, result_path_y = P_corridors.first_test()
     P_w.show_short_path(result_path_x, result_path_y)
