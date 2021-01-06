@@ -420,7 +420,7 @@ class Particle_wsarm:
                            step)
             self.micro_process()
 
-    def show_short_path(self, x_path, y_path, length=3000):
+    def show_short_path(self, x_path, y_path, x_points, y_points, length=3000):
         fig, ax = plt.subplots(2)
         ax[1].set_xlim(0, length)
         ax[1].set_ylim(0, 21000)
@@ -449,6 +449,7 @@ class Particle_wsarm:
         for x_p, y_p in zip(x_path, y_path):
             ax[0].plot(x_p, y_p)
 
+        ax[0].scatter(x_points, y_points, marker='x', color='black')
         # ax[1].text(480, 10, t)
         ax[1].legend()
 
@@ -495,6 +496,8 @@ class Corridors:
         self.w_dist_bw = []
         self.weights = []
         self.indexes = []
+        self.permited_points_x = []
+        self.permited_points_y = []
 
     def find_ar_point(self):
         '''
@@ -604,6 +607,23 @@ class Corridors:
         self.qu_mask_bt_cl = qu_mask_bt_cl_zeros  # saving the matrix of attention weights
         self.qu_w_dist = qu_w_dist_zeros  # saving the matrix of distant weights
 
+    def find_min_dist_point_drops(self):
+        a_source = []
+        for x, y in zip(self.x_arr, self.y_arr):
+            if np.amin(self.x_obj - x) == 0:
+                print(np.min(self.y_obj - y))
+            #print('Here', x, y, np.min(np.sqrt(np.square(self.x_obj - x) + np.square(self.y_obj - y))))
+            a_min = np.min(np.sqrt(np.square(self.x_obj - x) + np.square(self.y_obj - y)))
+            a_source.append(a_min)
+
+        #print(a_source)
+        a_source = np.array(a_source)
+        min_dist_mtr = np.array([a_source, ] * a_source.shape[0])  # transforming distant list to square matrix
+        np.fill_diagonal(min_dist_mtr, 0)  # removing diagonal elements
+
+        self.min_dist_mtr = min_dist_mtr  # saving weight distant matrix
+
+
     def find_dist_ar_p(self):
         """
         Function founds weights of average points as the distant between average points.
@@ -627,13 +647,21 @@ class Corridors:
         self.weights = self.qu_w_dist * k_w_dist + self.qu_mask_bt_cl * k_mask_bt_cl \
                        + self.w_dist_bw * k_dist_bw  # Summing weights
 
-    def exception_weight(self, thr=0.2):
+    def exception_weight(self, thr=0.6):
         """
         Function founds the points where the distant between points less then threshold
         """
         # FOR DEBUGGING: The threshold have to be rejected
-        max_dist = np.max(self.w_dist_bw)  # Founding the maximal distant
-        self.indexes = np.argwhere(self.w_dist_bw <= max_dist * thr)  # Founding the indexes less then threshold
+        max_dist = np.max(self.min_dist_mtr)  # Founding the maximal distant
+        self.indexes = np.argwhere(self.min_dist_mtr >= max_dist * thr)
+        # Founding the indexes less then threshold
+        print('Shape', self.indexes.shape)
+        for ind in self.indexes:
+            if ind[0] != ind[1]:
+                self.permited_points_x.append(self.x_arr[ind[0]])
+                self.permited_points_y.append(self.y_arr[ind[1]])
+
+
 
     def set_graph(self):
         """
@@ -643,6 +671,8 @@ class Corridors:
         self.G.add_nodes_from(nodes)  # Initialling the nodes of graph
         for edge in self.indexes:
             if edge[0] == edge[1]:  # exception diagonal points
+                continue
+            elif edge[0] >= 1128 and edge[1] >= 1128:
                 continue
             self.G.add_edge(edge[0], edge[1], weight=self.weights[edge[0], edge[1]])  # Adding edge weights
 
@@ -666,10 +696,12 @@ class Corridors:
         self.add_points()
         self.find_dist_ar_p()
         self.summing_w()
+        self.find_min_dist_point_drops()
         self.exception_weight()
         self.set_graph()
         s = (self.x_doors.shape[0], self.x_doors.shape[0])
         print(s)
+        max_length = 0
         pathes_x = []
         pathes_y = []
         pathes = np.array([])
@@ -685,6 +717,7 @@ class Corridors:
 
         print(matrix_short_pathes)
         i, j = np.unravel_index(matrix_short_pathes.argmax(), matrix_short_pathes.shape)
+        max_length = matrix_short_pathes[i, j]
         print(i, j)
         path_x, path_y, path = self.shortest_path(i, j)
         pathes = np.append(pathes, path)
@@ -694,18 +727,23 @@ class Corridors:
         for point in accountant_doors:
             lengthes = np.array([])
             for node in pathes:
-                length = nx.shortest_path_length(self.G, source=self.x_arr.shape[0] - point - 1, target=node,
-                                                 weight='weight')
-                lengthes = np.append(lengthes, length)
+                if self.x_arr.shape[0] - point - 1 != node:
+                    length = nx.shortest_path_length(self.G, source=self.x_arr.shape[0] - point - 1, target=node,
+                                                     weight='weight')
+                    lengthes = np.append(lengthes, length)
+                else:
+                    lengthes = np.append(lengthes, max_length)
+
             print('Pathes', pathes)
             print('Leghtes', lengthes)
             n_nodes = np.unravel_index(lengthes.argmin(), lengthes.shape)
             n_nodes = pathes[n_nodes]
-            path = nx.shortest_path(self.G, source=self.x_arr.shape[0] - point - 1,
+            path_2 = nx.shortest_path(self.G, source=self.x_arr.shape[0] - point - 1,
                                     target=n_nodes, weight='weight')
-            path_x = self.x_arr[path]
-            path_y = self.y_arr[path]
-            np.append(pathes, path)
+            print("Path", path_2, 'indexes', self.x_arr.shape[0] - point - 1, n_nodes)
+            path_x = self.x_arr[path_2]
+            path_y = self.y_arr[path_2]
+            np.append(pathes, path_2)
             pathes_x.append(path_x)
             pathes_y.append(path_y)
 
@@ -971,6 +1009,7 @@ if __name__ == "__main__":
     P_w.process()
     current_x_obj = P_w.points_obj_x
     current_y_obj = P_w.points_obj_y
-    P_corridors = Corridors(current_x_obj, current_y_obj, cl_att_cl, Num_cl, [52, 8, 35], [31, 22, 10])
+    P_corridors = Corridors(current_x_obj, current_y_obj, cl_att_cl, Num_cl, [52, 8, 35, 35, 20], [31, 22, 10, 35, 10])
     result_path_x, result_path_y = P_corridors.first_test()
-    P_w.show_short_path(result_path_x, result_path_y)
+    potential_x_path, potential_y_path = P_corridors.permited_points_x, P_corridors.permited_points_y
+    P_w.show_short_path(result_path_x, result_path_y, potential_x_path, potential_y_path)
