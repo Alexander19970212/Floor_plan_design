@@ -449,11 +449,11 @@ class Particle_wsarm:
         for x_p, y_p in zip(x_path, y_path):
             ax[0].plot(x_p, y_p)
 
-        ax[0].scatter(x_points, y_points, marker='x', color='black')
+        #ax[0].scatter(x_points, y_points)
         # ax[1].text(480, 10, t)
         ax[1].legend()
 
-        fig.savefig(f"Result_short_path_2.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
+        fig.savefig(f"Result_short_path_3.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
         plt.close(fig)
 
 
@@ -509,8 +509,8 @@ class Corridors:
         np.fill_diagonal(qu_obj_y, 0)  # removing diagonal elements from y matrix
 
         # FOR DEBUGING: signs might be changed
-        x_arr = qu_obj_x + (qu_obj_x.transpose() - qu_obj_x) / 2  # founding average points x
-        y_arr = qu_obj_y + (qu_obj_y.transpose() - qu_obj_y) / 2  # founding average points y
+        x_arr = qu_obj_x - (qu_obj_x - qu_obj_x.transpose()) / 2  # founding average points x
+        y_arr = qu_obj_y - (qu_obj_y - qu_obj_y.transpose()) / 2  # founding average points y
 
         '''
         Average points matrix are transformed to list as the elements above diagonal 
@@ -527,6 +527,8 @@ class Corridors:
 
         self.x_arr = np.array(x_arr_list)  # adding x list into class
         self.y_arr = np.array(y_arr_list)  # adding y list into class
+
+
 
     def between_class_mask(self):
         """
@@ -597,8 +599,8 @@ class Corridors:
         self.y_arr = np.append(self.y_arr, self.y_doors)  # Adding y of doors
 
         qu_w_dist_zeros = np.zeros(
-            [self.x_arr.shape[0], self.x_arr.shape[0]])  # creating the zero matrix size with new points
-        qu_mask_bt_cl_zeros = np.zeros([self.x_arr.shape[0], self.x_arr.shape[0]])
+            [self.x_arr.shape[0], self.x_arr.shape[0]]) + np.max(self.qu_w_dist)  # creating the zero matrix size with new points
+        qu_mask_bt_cl_zeros = np.zeros([self.x_arr.shape[0], self.x_arr.shape[0]]) + np.max(self.qu_mask_bt_cl)
 
         qu_w_dist_zeros[:self.qu_w_dist.shape[0], :self.qu_w_dist.shape[1]] = self.qu_w_dist  # coping the old result
         # into expended matrix
@@ -639,7 +641,7 @@ class Corridors:
         # FOR DEBUGGING: Distant between points could be saved as list
         self.w_dist_bw = np.sqrt(np.square(pr_d_x) + np.square(pr_d_y))  # Getting and saving the distant between points
 
-    def summing_w(self, k_w_dist=1, k_mask_bt_cl=10, k_dist_bw=1):
+    def summing_w(self, k_w_dist=1, k_mask_bt_cl=2, k_dist_bw=100):
         """
         Function sums the weights (distant between average points, distant between drops, attention between drops)
         """
@@ -647,21 +649,25 @@ class Corridors:
         self.weights = self.qu_w_dist * k_w_dist + self.qu_mask_bt_cl * k_mask_bt_cl \
                        + self.w_dist_bw * k_dist_bw  # Summing weights
 
-    def exception_weight(self, thr=0.6):
+    def exception_weight(self, thr=0.5):
         """
         Function founds the points where the distant between points less then threshold
         """
         # FOR DEBUGGING: The threshold have to be rejected
         max_dist = np.max(self.min_dist_mtr)  # Founding the maximal distant
-        self.indexes = np.argwhere(self.min_dist_mtr >= max_dist * thr)
+        min_dist = np.max(self.w_dist_bw)
+        self.indexes = np.argwhere((self.min_dist_mtr >= max_dist * thr) & (self.w_dist_bw <= min_dist*0.25))
         # Founding the indexes less then threshold
         print('Shape', self.indexes.shape)
+        #print('Indexes', self.indexes)
         for ind in self.indexes:
             if ind[0] != ind[1]:
                 self.permited_points_x.append(self.x_arr[ind[0]])
-                self.permited_points_y.append(self.y_arr[ind[1]])
+                self.permited_points_y.append(self.y_arr[ind[0]])
+                #self.permited_points_y.append(self.y_arr[ind[1]])
+                #self.permited_points_x.append(self.x_arr[ind[0]])
 
-
+        print('Swept', len(self.permited_points_x) / self.x_arr.shape[0])
 
     def set_graph(self):
         """
@@ -748,6 +754,14 @@ class Corridors:
             pathes_y.append(path_y)
 
         print(pathes_x)
+        fig, ax = plt.subplots()
+        ax.scatter(self.x_arr, self.y_arr, color='blue')
+        ax.scatter(self.permited_points_x, self.permited_points_y, color='black', marker="x")
+        for p_x, p_y in zip(pathes_x, pathes_y):
+            ax.plot(p_x, p_y)
+        fig.savefig(f"Sqr.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
+        #for p_x, p_y in
         return pathes_x, pathes_y
 
 
