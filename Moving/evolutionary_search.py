@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 from pathos.multiprocessing import ProcessPool
 
@@ -37,10 +38,13 @@ class EvolSearch:
         self.mutation_variance = evol_params['mutation_variance']
         self.probability_mask = evol_params['probability_mask']
         self.bounds = evol_params['bounds']
+        self.num_branches = 3
+
+        self.coefficients = None
 
         # create other required data
         self.num_processes = evol_params.get('num_processes', None)
-        #self.pop = np.random.rand(self.pop_size, self.genotype_size)
+        # self.pop = np.random.rand(self.pop_size, self.genotype_size)
         self.fitness = np.zeros(self.pop_size)
         self.num_batches = int(self.pop_size / self.num_processes)
         self.num_remainder = int(self.pop_size % self.num_processes)
@@ -50,14 +54,40 @@ class EvolSearch:
         __evolsearch_process_pool = ProcessPool(self.num_processes)
         time.sleep(0.5)
 
-        pop = []
+        first_pop = np.array([self.gen_genartion() for i in range(self.pop_size)])
 
+    def gen_genartion(self):
+        big_gen = []
         for net_mask, net_doubt in zip(self.probability_mask, self.bounds):
             net_gen = []
-            for probability, value_slot:
+            for probability, value_slot in zip(net_mask, net_doubt):
 
+                if type(probability) is int:
+                    net_gen.append(random.triangular(value_slot[0], value_slot[1],
+                                                     value_slot[0] + (value_slot[1] - value_slot[0]) * probability))
+                elif type(probability) is float:
+                    net_gen.append(random.triangular(value_slot[0], value_slot[1],
+                                                     value_slot[0] + (value_slot[1] - value_slot[0]) * probability))
+                elif type(probability) is str:
+                    net_gen.append(random.uniform(value_slot[0], value_slot[1]))
+                else:
+                    # print(value_slot, probability)
+                    net_gen.append(random.choices(value_slot, cum_weights=probability, k=1)[0])
 
+                # elif type(probability) == 'str':
+                # else:
+            big_gen.append(net_gen)
 
+        return big_gen
+
+    def colibarate_fitnes(self, individual_index):
+        if self.optional_args:
+            if len(self.optional_args) == 1:
+                return self.fitness_function(self.pop[individual_index, :], self.optional_args[0])
+            else:
+                return self.fitness_function(self.pop[individual_index, :], self.optional_args[individual_index])
+        else:
+            return self.fitness_function(self.pop[individual_index, :], self.coefficients)
 
     def evaluate_fitness(self, individual_index):
         '''
@@ -107,17 +137,44 @@ class EvolSearch:
         # estimate fitness using multiprocessing pool
         if __evolsearch_process_pool:
             # pool exists
-            self.fitness = np.asarray(__evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.pop_size)))
+            self.fitness, self.mask_broken = np.asarray(
+                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.pop_size)))
         else:
             # re-create pool
             __evolsearch_process_pool = Pool(self.num_processes)
-            self.fitness = np.asarray(__evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.pop_size)))
+            self.fitness, self.mask_broken = np.asarray(
+                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.pop_size)))
+
+
+        self.dynasties_pop = np.split(self.pop, self.num_branches)
+        self.dynasties_fitness = np.split(self.fitness, self.num_branches)
+        self.dynasty_mask_broken = np.split(self.mask_broken, self.num_branches)
+
+        for pop, fitness, mask_broken in zip(self.dynasties_pop, self.dynasties_fitness, self.dynasty_mask_broken):
+            dynasty_size = pop.shape[0]
+            bufer_pop = pop[np.argsort(fitness)[-self.elitist_fraction:], :] # parents
 
         # elitist_selection
+
         self.elitist_selection()
 
         # mutation
         self.mutation()
+
+    def colibration(self):
+        global __evolsearch_process_pool
+
+        coefficient = None
+        # estimate fitness using multiprocessing pool
+        if __evolsearch_process_pool:
+            # pool exists
+            coefficients = np.asarray(__evolsearch_process_pool.map(self.colibarate_fitnes, np.arange(self.pop_size)))
+        else:
+            # re-create pool
+            __evolsearch_process_pool = Pool(self.num_processes)
+            coefficient = np.asarray(__evolsearch_process_pool.map(self.colibarate_fitnes, np.arange(self.pop_size)))
+
+        self.coefficients = np.amax(coefficient, axis=0)
 
     def execute_search(self, num_gens):
         '''
