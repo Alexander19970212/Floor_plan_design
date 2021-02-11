@@ -107,7 +107,7 @@ class EvolSearch:
         '''
         self.pop = self.pop[np.argsort(self.fitness)[-self.elitist_fraction:], :]
 
-    def mutation(self):
+    def mutation_eld(self):
         '''
         create new pop by repeating mutated copies of elitist individuals
         '''
@@ -128,6 +128,29 @@ class EvolSearch:
         # clipping to genotype range
         self.pop = np.clip(self.pop, 0, 1)
 
+    def mutation(self, parents, n_copies, mask):
+        parents_copies = np.tile(parents, [n_copies, 1])
+        mask_copies = np.tile(mask, [n_copies, 1])
+        random_mat = np.array([self.gen_genartion() for i in range(n_copies)])
+        mut_mask = np.random.randint(2, size=parents_copies.shape) * mask_copies
+        negative_mut_mask = (mut_mask - 1) * (-1)
+        return parents_copies * negative_mut_mask + random_mat * mut_mask
+
+    def crosover(self, parents, req_pop):
+        np.random.shuffle(parents)
+        children = np.array([])
+        while children.shape[0] < req_pop:
+            for parent_1 in parents:
+                for parent_2 in parents:
+                    if random.randint(0, 1):
+                        mask_gen = np.random.randint(2, size=(parent_1.shape[0], parent_1.shape[1]))
+                        mask_gen = np.tile(mask_gen, [1, 1, parent_1.shape[2]])
+                        negativ_mask_gen = (mask_gen - 1) * (-1)
+                        child = parent_1 * negativ_mask_gen + parent_2 * mask_gen
+                        children = np.append(children, [child], axis=0)
+
+        return children
+
     def step_generation(self):
         '''
         evaluate fitness of pop, and create new pop after elitist_selection and mutation
@@ -145,21 +168,42 @@ class EvolSearch:
             self.fitness, self.mask_broken = np.asarray(
                 __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.pop_size)))
 
-
         self.dynasties_pop = np.split(self.pop, self.num_branches)
         self.dynasties_fitness = np.split(self.fitness, self.num_branches)
         self.dynasty_mask_broken = np.split(self.mask_broken, self.num_branches)
 
+        self.fund_best_parents = np.array([])
+        new_pop = np.array([])
+
         for pop, fitness, mask_broken in zip(self.dynasties_pop, self.dynasties_fitness, self.dynasty_mask_broken):
             dynasty_size = pop.shape[0]
-            bufer_pop = pop[np.argsort(fitness)[-self.elitist_fraction:], :] # parents
+            bufer_pop = pop[np.argsort(fitness)[-self.elitist_fraction:], :]  # parents
+            fund_best_parents = np.append(self.fund_best_parents, bufer_pop, axis=0)
+            _mask = mask_broken[np.argsort(fitness)[-self.elitist_fraction:], :]
+            n_parents = bufer_pop.shape[0]  # number of parents
+            n_mutation = int((dynasty_size - n_parents) / 3)  # number copies for mutation
+            n_cross = int((dynasty_size - n_parents) / 3)  # number copies for crosingover
+            n_mutation_cross = dynasty_size - n_parents - n_mutation - n_cross  # number for cross and mutation
 
-        # elitist_selection
+            if random.randint(0, 1) and fund_best_parents.shape[0] > 0:
+                index_foundling = np.random.choice(np.arange(self.fund_best_parents.shape[0]))
+                parents = np.vstack((bufer_pop, [self.fund_best_parents[index_foundling, :]]))
+            else:
+                parents = bufer_pop
 
-        self.elitist_selection()
+            new_pop_dynasty = bufer_pop
+            new_pop_dynasty = np.vstack((new_pop_dynasty, self.mutation(parents, n_mutation, _mask)))
 
-        # mutation
-        self.mutation()
+            new_pop_dynasty = np.vstack((new_pop_dynasty, self.crosover(parents, n_cross)))
+            mut_for_cross = self.crosover(bufer_pop, n_mutation_cross)
+            _mask = np.ones_like(mut_for_cross)
+            new_pop_dynasty = np.vstack((new_pop_dynasty, self.mutation(mut_for_cross, 1, _mask)))
+            new_pop = np.append(new_pop, new_pop_dynasty, axis=0)
+
+        if random.randint(0, 1):
+            self.fund_best_parents = np.array([])
+
+        self.pop = new_pop
 
     def colibration(self):
         global __evolsearch_process_pool
