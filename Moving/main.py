@@ -1,6 +1,6 @@
 import numpy as np
 import random
-
+from evolutionary_search import EvolSearch
 
 class Optimizer:
     def __init__(self, classes):
@@ -11,8 +11,44 @@ class Optimizer:
         self.probability_mask_constructor()
         # self.bounds = np.array(self.bounds)
         # self.probability_mask = np.array(self.probability_mask)
-        print(self.probability_mask)
-        self.gen_constructor()
+        #print(self.probability_mask)
+        #gen = self.gen_constructor()
+        #koef = self.calibration_function(gen)
+        #new_gen = self.gen_constructor()
+        #result = self.fitness_function(new_gen, koef)
+
+        evol_params = {
+            'num_processes': 4,  # (optional) number of proccesses for multiprocessing.Pool
+            'pop_size': 200,  # population size
+            'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
+            'calibration_function': self.calibration_function,
+            'elitist_fraction': 2,  # fraction of population retained as is between generations
+            'bounds': self.bounds,
+            'probability_mask': self.probability_mask,
+            'num_branches': 3
+        }
+
+        es = EvolSearch(evol_params)
+
+        '''OPTION 1
+        # execute the search for 100 generations
+        num_gens = 100
+        es.execute_search(num_gens)
+        '''
+
+        '''OPTION 2'''
+        # keep searching till a stopping condition is reached
+        num_gen = 0
+        max_num_gens = 102
+        desired_fitness = 0.5
+        while es.get_best_individual_fitness() < desired_fitness and num_gen < max_num_gens:
+            print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
+            es.step_generation()
+            num_gen += 1
+
+        # print results
+        print('Max fitness of population = ', es.get_best_individual_fitness())
+        print('Best individual in population = ', es.get_best_individual())
 
     def bounds_constructor(self):
         for kind in self.Classes:
@@ -58,7 +94,37 @@ class Optimizer:
                 # elif type(probability) == 'str':
                 # else:
             big_gen.append(net_gen)
-        print(big_gen)
+        #print(big_gen)
+        return big_gen
+
+    def test_function(self, x_vector):
+        A = np.sum(x_vector[:][0])
+        B = np.sum(x_vector[:][1])
+        C = np.sum(x_vector[:][2])
+        D = np.sum(x_vector[:][3])
+        #print([A, B, C, D])
+        return np.array([A, B, C, D])
+
+    def calibration_function(self, x_vector):
+        x_vector = np.array(x_vector, dtype="object")
+        #print(x_vector)
+        return self.test_function(x_vector)
+
+    def fitness_function(self, gen, koef):
+        x_vector = np.array(gen, dtype="object")
+        test_attention = np.array([0.3, 0.3, 0.2, 0.2])
+        D = self.test_function(x_vector)
+        result = np.sum(test_attention*D/koef)
+        mask= []
+        for grid in gen:
+            mask.append(np.ones_like(np.array(grid)))
+        #print(result)
+        return [result, np.array(mask)]
+
+
+
+
+
 
 
 if __name__ == "__main__":
