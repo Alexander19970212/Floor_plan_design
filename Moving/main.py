@@ -40,8 +40,11 @@ class Optimizer:
         # keep searching till a stopping condition is reached
         num_gen = 0
         max_num_gens = 102
-        desired_fitness = 0.5
-        while es.get_best_individual_fitness() < desired_fitness and num_gen < max_num_gens:
+        desired_fitness = 0.05
+        es.step_generation()
+        print(es.get_best_individual_fitness())
+        print(es.get_best_individual_fitness() > desired_fitness) # and num_gen > max_num_gens)
+        while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
             print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
             es.step_generation()
             num_gen += 1
@@ -119,7 +122,7 @@ class Optimizer:
         for grid in gen:
             mask.append(np.ones_like(np.array(grid)))
         #print(result)
-        return [result, np.array(mask)]
+        return [result, np.array(mask, dtype='object')]
 
 
 

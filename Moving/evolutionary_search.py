@@ -56,7 +56,7 @@ class EvolSearch:
         __evolsearch_process_pool = ProcessPool(self.num_processes)
         time.sleep(0.5)
 
-        self.pop = np.array([self.gen_genartion() for i in range(self.pop_size)])
+        self.pop = np.array([self.gen_genartion() for i in range(self.pop_size)], dtype='object')
         self.colibration()
 
     def gen_genartion(self):
@@ -131,34 +131,69 @@ class EvolSearch:
         # clipping to genotype range
         self.pop = np.clip(self.pop, 0, 1)
 
-    def mutation(self, parents, n_copies, mask):
+    def mutation(self, parents, n_copies, mask, cross):
+
         mask = np.array(mask, dtype='object')
         parents = np.array(parents, dtype='object')
-        parents_copies = np.tile(parents, [n_copies, 1])
-        parents_copies = parents_copies[:n_copies, :]
-        mask_copies = np.tile(mask, n_copies)
-        mask_copies = mask_copies[:n_copies]
-        random_mat = np.array([self.gen_genartion() for i in range(n_copies)])
+        if not cross:
+            parents_copies = np.tile(parents, [n_copies, 1])
+            parents = parents_copies[:n_copies, :]
+            mask_copies = np.tile(mask, n_copies)
+            mask = mask_copies[:n_copies]
+        random_mat = np.array([self.gen_genartion() for i in range(parents.shape[0])], dtype='object')
         result_pop = []
-        for gen_copy, random_mat_gen, mask_gen in zip(parents_copies, random_mat, mask_copies):
-            mut_mask = np.random.randint(2, size=np.array(gen_copy).shape) #* mask_gen
-            negative_mut_mask = (mut_mask - 1) * (-1)
-            result_pop.append(gen_copy * negative_mut_mask + random_mat_gen * mut_mask)
+
+        for gen_copy, random_mat_gen, mask_gen in zip(parents, random_mat, mask):
+            # max_length = 0
+            # gen = []
+            # rand_gen = []
+            # for hromasoma in gen_copy:
+            #     if len(hromasoma) > max_length:
+            #         max_length = len(hromasoma)
+            # for hromasoma, mask_hrom in zip(gen_copy, random_mat_gen):
+            #     while len(hromasoma) < max_length:
+            #         hromasoma.append(None)
+            #         mask_hrom.append(None)
+            #     gen.append(hromasoma)
+            #     rand_gen.append(mask_hrom)
+            #  = np.reshape(gen_copy, (gen_copy.shape[0], max_length))
+            # gen_copy = np.array(gen)
+            # random_mat_gen = np.array(rand_gen)
+            gen = []
+            for hrom_gen, hrom_random, hrom_mask in zip(gen_copy, random_mat_gen, mask_gen):
+                mut_mask = np.random.choice(2, len(hrom_gen), p=[0.7, 0.3])
+                negative_mut_mask = (mut_mask - 1) * (-1)
+                hrom_gen = hrom_gen * negative_mut_mask + hrom_random * mut_mask
+                gen.append(hrom_gen)
+            # mut_mask = np.random.randint(2, size=gen_copy.shape) #* mask_gen
+            # negative_mut_mask = (mut_mask - 1) * (-1)
+            result_pop.append(gen)
+        result_pop = np.array(result_pop, dtype='object')
         return result_pop
 
     def crosover(self, parents, req_pop):
         np.random.shuffle(parents)
-        children = np.array([])
-        while children.shape[0] < req_pop:
+        children = []
+        while len(children) < req_pop:
+            i = 0
             for parent_1 in parents:
+                j = 0
                 for parent_2 in parents:
-                    if random.randint(0, 1):
-                        mask_gen = np.random.randint(2, size=(parent_1.shape[0], parent_1.shape[1]))
-                        mask_gen = np.tile(mask_gen, [1, 1, parent_1.shape[2]])
-                        negativ_mask_gen = (mask_gen - 1) * (-1)
-                        child = parent_1 * negativ_mask_gen + parent_2 * mask_gen
-                        children = np.append(children, [child], axis=0)
+                    if random.randint(0, 1) and i != j:
+                        mask = np.random.choice(2, parent_1.shape[0], p=[0.8, 0.2])
+                        # mask_gen = np.random.randint(2, size=(parent_1.shape[0], parent_1.shape[1]))
+                        # mask_gen = np.tile(mask_gen, [1, 1, parent_1.shape[2]])
+                        negativ_mask = (mask - 1) * (-1)
+                        try:
+                            child = parent_1 * negativ_mask + parent_2 * mask
+                            children.append(child)
+                        except:
+                            # print('HZ')
+                            pass
+                    j += 1
+                i += 1
 
+        children = np.array(children, dtype='object')[:req_pop]
         return children
 
     def step_generation(self):
@@ -178,29 +213,34 @@ class EvolSearch:
             self.fitness = np.asarray(
                 __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.pop_size)))
 
-
         self.fitness = np.array(self.fitness, dtype="object")
         self.mask_broken = self.fitness[:, 1]
         self.fitness = self.fitness[:, 0]
-        #print(self.mask_broken)
+        # print(self.mask_broken)
 
         self.dynasties_pop = np.array_split(self.pop, self.num_branches)
         self.dynasties_fitness = np.array_split(self.fitness, self.num_branches)
         self.dynasty_mask_broken = np.array_split(self.mask_broken, self.num_branches)
 
-        self.fund_best_parents = None
-        new_pop = np.array([])
+        self.fund_best_parents = []
+        new_pop = []
+        number_dynasty = 0
 
         for pop, fitness, mask_broken in zip(self.dynasties_pop, self.dynasties_fitness, self.dynasty_mask_broken):
+            print('Dynasty: ', number_dynasty, np.min(fitness))
+            number_dynasty += 1
             dynasty_size = pop.shape[0]
-            bufer_pop = pop[np.argsort(fitness)[-self.elitist_fraction:], :]  # parents
-            print(bufer_pop)
-            if self.fund_best_parents == None:
+            parents_indexes = np.argsort(fitness * (-1))[-self.elitist_fraction:]
+            # bufer_pop = pop[np.argsort(fitness)[:self.elitist_fraction]]  # parents
+            # _mask = mask_broken[np.argsort(fitness)[:self.elitist_fraction]]
+            bufer_pop = pop[parents_indexes, :]
+            _mask = mask_broken[parents_indexes]
+            # print(bufer_pop)
+            if len(self.fund_best_parents) == 0:
                 self.fund_best_parents = bufer_pop
             else:
                 fund_best_parents = np.append(self.fund_best_parents, bufer_pop, axis=0)
 
-            _mask = mask_broken[np.argsort(fitness)[-self.elitist_fraction:]]
             n_parents = bufer_pop.shape[0]  # number of parents
             n_mutation = int((dynasty_size - n_parents) / 3)  # number copies for mutation
             n_cross = int((dynasty_size - n_parents) / 3)  # number copies for crosingover
@@ -213,18 +253,19 @@ class EvolSearch:
                 parents = bufer_pop
 
             new_pop_dynasty = bufer_pop
-            new_pop_dynasty = np.vstack((new_pop_dynasty, self.mutation(parents, n_mutation, _mask)))
+            new_pop_dynasty = np.vstack((new_pop_dynasty, self.mutation(parents, n_mutation, _mask, 0)))
 
-            new_pop_dynasty = np.vstack((new_pop_dynasty, self.crosover(parents, n_cross)))
+            new_pop_dynasty = np.vstack((new_pop_dynasty, self.crosover(bufer_pop, n_cross)))
             mut_for_cross = self.crosover(bufer_pop, n_mutation_cross)
             _mask = np.ones_like(mut_for_cross)
-            new_pop_dynasty = np.vstack((new_pop_dynasty, self.mutation(mut_for_cross, 1, _mask)))
-            new_pop = np.append(new_pop, new_pop_dynasty, axis=0)
+            new_pop_dynasty = np.vstack((new_pop_dynasty, self.mutation(mut_for_cross, 1, _mask, 1)))
+            new_pop.extend(new_pop_dynasty)
 
         if random.randint(0, 1):
-            self.fund_best_parents = None
+            self.fund_best_parents = []
 
-        self.pop = new_pop
+        self.pop = np.array(new_pop, dtype='object')
+        print('Mass_after', self.pop.shape[0])
 
     def colibration(self):
         global __evolsearch_process_pool
@@ -240,8 +281,7 @@ class EvolSearch:
             coefficient = np.asarray(__evolsearch_process_pool.map(self.colibarate_fitnes, np.arange(self.pop_size)))
 
         self.coefficients = np.amax(coefficient, axis=0)
-        print('SCH ', self.coefficients)
-
+        # print('SCH ', self.coefficients)
 
     def execute_search(self, num_gens):
         '''
@@ -261,13 +301,13 @@ class EvolSearch:
         '''
         returns 1D array of the genotype that has max fitness
         '''
-        return self.pop[np.argmax(self.fitness), :]
+        return self.pop[np.argmin(self.fitness), :]
 
     def get_best_individual_fitness(self):
         '''
         return the fitness value of the best individual
         '''
-        return np.max(self.fitness)
+        return np.min(self.fitness)
 
     def get_mean_fitness(self):
         '''
