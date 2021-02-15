@@ -9,21 +9,22 @@ __evolsearch_process_pool = None
 
 class EvolSearch:
     def __init__(self, evol_params):
-        '''
+        """
         Initialize evolutionary search
         ARGS:
         evol_params: dict
             required keys -
                 pop_size: int - population size,
-                genotype_size: int - genotype_size,
-                fitness_function: function - a user-defined function that takes a genotype as arg and returns a float fitness value
-                elitist_fraction: float - fraction of top performing individuals to retain for next generation
-                mutation_variance: float - variance of the gaussian distribution used for mutation noise
-            optional keys -
-                fitness_args: list-like - optional additional arguments to pass while calling fitness function
-                                           list such that len(list) == 1 or len(list) == pop_size
+                calibration_function: function - a user-defined function that takes a genotype as args and returns
+                                        a list of max values of penalty function,
+                fitness_function: function - a user-defined function that takes a genotype
+                                    as arg and returns a float fitness value
+                elitist_fraction: int - parents number for every dynasty
+                bounds: 2d-array - list that contains slots for each variables
+                probability_mask: array - probability distribution within bounds
+                num_branches: int - dynasty number
                 num_processes: int -  pool size for multiprocessing.pool.Pool - defaults to os.cpu_count()
-        '''
+        """
         # check for required keys
         required_keys = ['pop_size', 'calibration_function', 'fitness_function', 'elitist_fraction',
                          "bounds", "probability_mask", "num_branches"]
@@ -33,8 +34,6 @@ class EvolSearch:
 
         # checked for all required keys
         self.pop_size = evol_params['pop_size']
-        self.optional_args = False
-
         self.fitness_function = evol_params['fitness_function']
         self.calibration_function = evol_params['calibration_function']
         self.elitist_fraction = evol_params['elitist_fraction']
@@ -42,49 +41,65 @@ class EvolSearch:
         self.bounds = evol_params['bounds']
         self.num_branches = evol_params['num_branches']
 
-        self.coefficients = None
-
         # create other required data
+        self.coefficients = None
         self.num_processes = evol_params.get('num_processes', None)
-        # self.pop = np.random.rand(self.pop_size, self.genotype_size)
-        self.fitness = np.zeros(self.pop_size)
-        self.num_batches = int(self.pop_size / self.num_processes)
-        self.num_remainder = int(self.pop_size % self.num_processes)
+
+        # check for fitness function kwargs
+        if 'fitness_args' in evol_params.keys():
+            optional_args = evol_params['fitness_args']
+            assert len(optional_args) == 1 or len(optional_args) == self.pop_size, \
+                "fitness args should be length 1 or pop_size."
+            self.optional_args = optional_args
+        else:
+            self.optional_args = None
 
         # creating the global process pool to be used across all generations
         global __evolsearch_process_pool
         __evolsearch_process_pool = ProcessPool(self.num_processes)
         time.sleep(0.5)
 
+        # create initial data of evolutionary search
         self.pop = np.array([self.gen_genartion() for i in range(self.pop_size)], dtype='object')
+        self.fitness = np.zeros(self.pop_size)
+
+        # auto scaling
         self.colibration()
 
     def gen_genartion(self):
-        big_gen = []
-        for net_mask, net_doubt in zip(self.probability_mask, self.bounds):
-            net_gen = []
-            for probability, value_slot in zip(net_mask, net_doubt):
+        """
+        The function creates gen according probability distribution
+        :return: list - generated gen that contains chromosomes
+        """
+        big_gen = []  # void list for appending chromosomes
+        for net_mask, net_doubt in zip(self.probability_mask, self.bounds):  # cycle over chromosomes
+            net_gen = []  # chromosome - void list for appending variables
+            for probability, value_slot in zip(net_mask, net_doubt):  # cycle over variables
 
-                if type(probability) is int:
+                #  appending variable from slot with offset distribution
+                if type(probability) is float or type(probability) is int:
                     net_gen.append(random.triangular(value_slot[0], value_slot[1],
                                                      value_slot[0] + (value_slot[1] - value_slot[0]) * probability))
-                elif type(probability) is float:
-                    net_gen.append(random.triangular(value_slot[0], value_slot[1],
-                                                     value_slot[0] + (value_slot[1] - value_slot[0]) * probability))
+
+                #  appending variable from slot with equally distribution
                 elif type(probability) is str:
                     net_gen.append(random.uniform(value_slot[0], value_slot[1]))
+
+                #  appending variable from list for choice
                 else:
-                    # print(value_slot, probability)
                     net_gen.append(random.choices(value_slot, cum_weights=probability, k=1)[0])
 
-                # elif type(probability) == 'str':
-                # else:
-            big_gen.append(net_gen)
+            big_gen.append(net_gen)  # appending created chromosome
 
         return big_gen
 
     def colibarate_fitnes(self, individual_index):
-        if self.optional_args:
+        """
+        Function returns list of penalty functions values for further auto scaling
+        :param individual_index: index of population that is calculated
+        :return: list of penalty functions values
+        """
+        if self.optional_args:  # for the case with kwargs
             if len(self.optional_args) == 1:
                 return self.fitness_function(self.pop[individual_index, :], self.optional_args[0])
             else:
@@ -93,10 +108,12 @@ class EvolSearch:
             return self.calibration_function(self.pop[individual_index, :])
 
     def evaluate_fitness(self, individual_index):
-        '''
-        Call user defined fitness function and pass genotype
-        '''
-        if self.optional_args:
+        """
+        Function returns value of object function
+        :param individual_index: index of population that is calculated
+        :return: value of fitness function
+        """
+        if self.optional_args:  # for the case with kwargs
             if len(self.optional_args) == 1:
                 return self.fitness_function(self.pop[individual_index, :], self.optional_args[0])
             else:
@@ -104,69 +121,39 @@ class EvolSearch:
         else:
             return self.fitness_function(self.pop[individual_index, :], self.coefficients)
 
-    def elitist_selection(self):
-        '''
-        from fitness select top performing individuals based on elitist_fraction
-        '''
-        self.pop = self.pop[np.argsort(self.fitness)[-self.elitist_fraction:], :]
-
-    def mutation_eld(self):
-        '''
-        create new pop by repeating mutated copies of elitist individuals
-        '''
-        # number of copies of elitists required
-        num_reps = int((self.pop_size - self.elitist_fraction) / self.elitist_fraction) + 1
-
-        # creating copies and adding noise
-        mutated_elites = np.tile(self.pop, [num_reps, 1])
-        mutated_elites += np.random.normal(loc=0., scale=self.mutation_variance,
-                                           size=[num_reps * self.elitist_fraction, self.genotype_size])
-
-        # concatenating elites with their mutated versions
-        self.pop = np.vstack((self.pop, mutated_elites))
-
-        # clipping to pop_size
-        self.pop = self.pop[:self.pop_size, :]
-
-        # clipping to genotype range
-        self.pop = np.clip(self.pop, 0, 1)
-
     def mutation(self, parents, n_copies, mask, cross):
+        """
+        Function expansions list of parents and changes some variables
+        :param parents: list of parents for copying
+        :param n_copies: size of result list (number of copies)
+        :param mask: mask for mutation - if mask is 1, there will mutation probability
+        :param cross: 1 for mutation after crossing (as a multi-operators),
+        :return: mutated copies of parents that have size n_copies
+        """
 
+        # representation list to numpy array
         mask = np.array(mask, dtype='object')
         parents = np.array(parents, dtype='object')
-        if not cross:
-            parents_copies = np.tile(parents, [n_copies, 1])
-            parents = parents_copies[:n_copies, :]
-            mask_copies = np.tile(mask, n_copies)
-            mask = mask_copies[:n_copies]
+
+        if not cross:  # in case if mutation is independent operators
+            parents_copies = np.tile(parents, [n_copies, 1])  # expansion area by copying parents
+            parents = parents_copies[:n_copies, :]  # cutting excess copies
+            mask_copies = np.tile(mask, n_copies)  # expansion probability mask by copying mask parents
+            mask = mask_copies[:n_copies]  # cutting excess copies
+
+        # create random matrix for carryover to mutation places
         random_mat = np.array([self.gen_genartion() for i in range(parents.shape[0])], dtype='object')
+
+        # void list for mutated copies
         result_pop = []
 
         for gen_copy, random_mat_gen, mask_gen in zip(parents, random_mat, mask):
-            # max_length = 0
-            # gen = []
-            # rand_gen = []
-            # for hromasoma in gen_copy:
-            #     if len(hromasoma) > max_length:
-            #         max_length = len(hromasoma)
-            # for hromasoma, mask_hrom in zip(gen_copy, random_mat_gen):
-            #     while len(hromasoma) < max_length:
-            #         hromasoma.append(None)
-            #         mask_hrom.append(None)
-            #     gen.append(hromasoma)
-            #     rand_gen.append(mask_hrom)
-            #  = np.reshape(gen_copy, (gen_copy.shape[0], max_length))
-            # gen_copy = np.array(gen)
-            # random_mat_gen = np.array(rand_gen)
             gen = []
             for hrom_gen, hrom_random, hrom_mask in zip(gen_copy, random_mat_gen, mask_gen):
                 mut_mask = np.random.choice(2, len(hrom_gen), p=[0.7, 0.3])
                 negative_mut_mask = (mut_mask - 1) * (-1)
                 hrom_gen = hrom_gen * negative_mut_mask + hrom_random * mut_mask
                 gen.append(hrom_gen)
-            # mut_mask = np.random.randint(2, size=gen_copy.shape) #* mask_gen
-            # negative_mut_mask = (mut_mask - 1) * (-1)
             result_pop.append(gen)
         result_pop = np.array(result_pop, dtype='object')
         return result_pop
