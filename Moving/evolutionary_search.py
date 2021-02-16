@@ -147,46 +147,56 @@ class EvolSearch:
         # void list for mutated copies
         result_pop = []
 
-        for gen_copy, random_mat_gen, mask_gen in zip(parents, random_mat, mask):
-            gen = []
-            for hrom_gen, hrom_random, hrom_mask in zip(gen_copy, random_mat_gen, mask_gen):
-                mut_mask = np.random.choice(2, len(hrom_gen), p=[0.7, 0.3])
-                negative_mut_mask = (mut_mask - 1) * (-1)
+        for gen_copy, random_mat_gen, mask_gen in zip(parents, random_mat, mask):  # cycle by copies list
+            gen = []  # for new (mutated) gen
+            for hrom_gen, hrom_random, hrom_mask in zip(gen_copy, random_mat_gen, mask_gen):  # cycle be chromosomes
+                #  making 1-d array, 1 - there is mutation in variable, 0 - there isn't mutation
+                mut_mask = np.random.choice(2, len(hrom_gen), p=[0.7, 0.3]) * hrom_mask  # making mutation more rare
+                negative_mut_mask = (mut_mask - 1) * (-1)  # opposite matrix
+                # from initial chromosome variable is replaced by variable from random chromosome
                 hrom_gen = hrom_gen * negative_mut_mask + hrom_random * mut_mask
-                gen.append(hrom_gen)
-            result_pop.append(gen)
+                gen.append(hrom_gen)  # fulling gen by chromosomes
+            result_pop.append(gen)  # saving new gen
+
+        # transformation new pop list as numpy array
         result_pop = np.array(result_pop, dtype='object')
         return result_pop
 
     def crosover(self, parents, req_pop):
-        np.random.shuffle(parents)
-        children = []
-        while len(children) < req_pop:
-            i = 0
-            for parent_1 in parents:
-                j = 0
-                for parent_2 in parents:
-                    if random.randint(0, 1) and i != j:
+        """
+        Function creates new genes from parents by mixing their chromosomes.
+        :param parents: initial genes
+        :param req_pop: required quantity of children
+        :return: numpy array 1-d, where children genes are objects
+        """
+        np.random.shuffle(parents)  # mixing of parents to get random children
+        children = []  # void list for fulling by children
+        while len(children) < req_pop:  # cycle while required quantity of children isn't reached
+            i = 0  # create counter not to have same parents
+            for parent_1 in parents:  # choosing the first parent
+                j = 0  # create the second counter not to have same parents
+                for parent_2 in parents:  # choosing the second parent
+                    if random.randint(0, 1) and i != j:  # cross will occur randomly and if parents are not same
+                        # chromosomes which will be crossed are selected according random list
                         mask = np.random.choice(2, parent_1.shape[0], p=[0.8, 0.2])
-                        # mask_gen = np.random.randint(2, size=(parent_1.shape[0], parent_1.shape[1]))
-                        # mask_gen = np.tile(mask_gen, [1, 1, parent_1.shape[2]])
-                        negativ_mask = (mask - 1) * (-1)
-                        try:
+                        negativ_mask = (mask - 1) * (-1)  # opposite matrix
+                        try: # for some reason, some genes don't cross
+                            # from the first parent some chromosomes are removed and chromosomes from the second parents
+                            # are added to that places
                             child = parent_1 * negativ_mask + parent_2 * mask
-                            children.append(child)
+                            children.append(child)  # new child are added to list of children
                         except:
-                            # print('HZ')
                             pass
                     j += 1
                 i += 1
 
-        children = np.array(children, dtype='object')[:req_pop]
+        children = np.array(children, dtype='object')[:req_pop]  # cutting excess genes
         return children
 
     def step_generation(self):
-        '''
+        """
         evaluate fitness of pop, and create new pop after elitist_selection and mutation
-        '''
+        """
         global __evolsearch_process_pool
 
         # estimate fitness using multiprocessing pool
