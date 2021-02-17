@@ -195,7 +195,7 @@ class EvolSearch:
 
     def step_generation(self):
         """
-        evaluate fitness of pop, and create new pop after elitist_selection and mutation
+        evaluate fitness of pop, and create new pop after crossing and mutation
         """
         global __evolsearch_process_pool
 
@@ -210,59 +210,72 @@ class EvolSearch:
             self.fitness = np.asarray(
                 __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.pop_size)))
 
-        self.fitness = np.array(self.fitness, dtype="object")
-        self.mask_broken = self.fitness[:, 1]
-        self.fitness = self.fitness[:, 0]
-        # print(self.mask_broken)
+        # returned list contains mask of broken genes and fitness value, so that is separated
+        self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
+        self.mask_broken = self.fitness[:, 1]  # extraction of mask for mutation
+        self.fitness = self.fitness[:, 0]  # remaining values are fitness values list
 
+        # separate to dynasties
         self.dynasties_pop = np.array_split(self.pop, self.num_branches)
         self.dynasties_fitness = np.array_split(self.fitness, self.num_branches)
         self.dynasty_mask_broken = np.array_split(self.mask_broken, self.num_branches)
 
+        # create bufer list for crossing between different dynasties
         self.fund_best_parents = []
-        new_pop = []
-        number_dynasty = 0
 
+        new_pop = []  # void list for new population
+        number_dynasty = 0  # counter of dynasties
+
+        # work over each dynasty separately
         for pop, fitness, mask_broken in zip(self.dynasties_pop, self.dynasties_fitness, self.dynasty_mask_broken):
             print('Dynasty: ', number_dynasty, np.min(fitness))
-            number_dynasty += 1
-            dynasty_size = pop.shape[0]
-            parents_indexes = np.argsort(fitness * (-1))[-self.elitist_fraction:]
-            # bufer_pop = pop[np.argsort(fitness)[:self.elitist_fraction]]  # parents
-            # _mask = mask_broken[np.argsort(fitness)[:self.elitist_fraction]]
+            number_dynasty += 1  # in that case counter needs only for printing so is grossing here
+
+            # initial of parents
+            parents_indexes = np.argsort(fitness * (-1))[-self.elitist_fraction:]  # select parents
             bufer_pop = pop[parents_indexes, :]
-            _mask = mask_broken[parents_indexes]
-            # print(bufer_pop)
+
+            _mask = mask_broken[parents_indexes]  # define mask for mutation for parents
+
+            # save parents for crossing with other dynasty
             if len(self.fund_best_parents) == 0:
                 self.fund_best_parents = bufer_pop
             else:
                 fund_best_parents = np.append(self.fund_best_parents, bufer_pop, axis=0)
 
+            # calculate quantity of mutation genes, crossed genes, and combination returned genes
+            dynasty_size = pop.shape[0]
             n_parents = bufer_pop.shape[0]  # number of parents
             n_mutation = int((dynasty_size - n_parents) / 3)  # number copies for mutation
-            n_cross = int((dynasty_size - n_parents) / 3)  # number copies for crosingover
+            n_cross = int((dynasty_size - n_parents) / 3)  # number copies for crossover
             n_mutation_cross = dynasty_size - n_parents - n_mutation - n_cross  # number for cross and mutation
 
+            # from time to time add gene from bufer to get crossing with previous dynasty
             if random.randint(0, 1) and self.fund_best_parents.shape[0] > 0:
                 index_foundling = np.random.choice(np.arange(self.fund_best_parents.shape[0]))
                 parents = np.vstack((bufer_pop, [self.fund_best_parents[index_foundling, :]]))
             else:
                 parents = bufer_pop
 
-            new_pop_dynasty = bufer_pop
+            new_pop_dynasty = bufer_pop  # new dynasty starts from parents
+            #  add genes that is gotten by mutation
             new_pop_dynasty = np.vstack((new_pop_dynasty, self.mutation(parents, n_mutation, _mask, 0)))
-
+            # add genes that is gotten by crossing
             new_pop_dynasty = np.vstack((new_pop_dynasty, self.crosover(bufer_pop, n_cross)))
+
+            # combined operators: crossing + mutation
             mut_for_cross = self.crosover(bufer_pop, n_mutation_cross)
             _mask = np.ones_like(mut_for_cross)
             new_pop_dynasty = np.vstack((new_pop_dynasty, self.mutation(mut_for_cross, 1, _mask, 1)))
+
+            # add dynasty to population
             new_pop.extend(new_pop_dynasty)
 
+        # from time to time clear bufer with genes for crossing between dynasties
         if random.randint(0, 1):
             self.fund_best_parents = []
 
-        self.pop = np.array(new_pop, dtype='object')
-        print('Mass_after', self.pop.shape[0])
+        self.pop = np.array(new_pop, dtype='object')  # transforming pop as numpy array
 
     def colibration(self):
         global __evolsearch_process_pool
@@ -279,14 +292,6 @@ class EvolSearch:
 
         self.coefficients = np.amax(coefficient, axis=0)
         # print('SCH ', self.coefficients)
-
-    def execute_search(self, num_gens):
-        '''
-        runs the evolutionary algorithm for given number of generations, num_gens
-        '''
-        # step generation num_gens times
-        for gen in np.arange(num_gens):
-            self.step_generation()
 
     def get_fitnesses(self):
         '''
