@@ -11,9 +11,24 @@ class Optimizer:
         self.probability_mask = []
         self.bounds_constructor()
         self.probability_mask_constructor()
-        previous_grid = self.get_cells_grids([30, 40], [1, 2], 50, 3, 2, 6, 2, 2, 7, -5)
+        gen = self.gen_constructor()
+        grid_1 = gen[0]
+        p_x, p_y = grid_1[0], grid_1[1]
+        offset_x, offset_y = grid_1[2], grid_1[3]
+        n_x, n_y = grid_1[4], grid_1[5]
+        off2_x, off2_y = grid_1[6], grid_1[7]
+        grid_angle = grid_1[8]
+        objects_angles = grid_1[10:]
+        amount = len(objects_angles)
+        previous_grid = self.get_cells_grids([30, 40], [offset_x, offset_y], 50, int(n_x), p_x, off2_x, int(n_y), p_x,
+                                             off2_y,
+                                             grid_angle)
+
         grid = self.cut_by_rectagular(previous_grid, [20, 60], [70, 20])
-        print(self.sorting_drops_bydistant(grid, [30, 40]))
+        centre_points = self.sorting_drops_bydistant(grid, [30, 40])[:amount]
+        rectangulars = self.get_objects_angle(amount, p_x, p_y, objects_angles)
+        print(self.locate_objects(rectangulars, centre_points))
+
         plt.plot(grid[:, 0], grid[:, 1], 'o')
         plt.show()
         # self.bounds = np.array(self.bounds)
@@ -164,8 +179,8 @@ class Optimizer:
         return grid
 
     def get_objects_angle(self, amount, p_x, p_y, rotation_list):
-        rects = np.array([[-p_x, p_y], [p_x, p_y], [p_x, -p_y], [-p_x, -p_y]]) / 2
-        rects = np.tile(rects, [amount, 1])
+        rects = np.array([[[-p_x, p_y], [p_x, p_y], [p_x, -p_y], [-p_x, -p_y]]]) / 2
+        rects = np.repeat(rects, amount, axis=0)
         rotated_rects = []
         for rect, angle in zip(rects, rotation_list):
             rotated_rects.append(self.ratation(rect, angle))
@@ -173,8 +188,13 @@ class Optimizer:
         return np.array(rotated_rects)
 
     def sorting_drops_bydistant(self, drops, main_point):
-        distant = ((drops[:, 0] - main_point[0]) ** 2 + (drops[:, 1] - main_point[1])**2)**0.5
+        distant = ((drops[:, 0] - main_point[0]) ** 2 + (drops[:, 1] - main_point[1]) ** 2) ** 0.5
         return drops[np.argsort(distant)]
+
+    def locate_objects(self, rects, centre_points):
+        centre_points = centre_points[:, np.newaxis, :]
+        centre_points = np.repeat(centre_points, 4, axis=2)
+        return rects + centre_points
 
     def ratation(self, drops, deg):
         theta = np.radians(deg)
