@@ -12,30 +12,11 @@ class Optimizer:
         self.bounds_constructor()
         self.probability_mask_constructor()
         gen = self.gen_constructor()
-        grid_1 = gen[0]
-        p_x, p_y = grid_1[0], grid_1[1]
-        offset_x, offset_y = grid_1[2], grid_1[3]
-        n_x, n_y = grid_1[4], grid_1[5]
-        off2_x, off2_y = grid_1[6], grid_1[7]
-        grid_angle = grid_1[8]
-        objects_angles = grid_1[10:]
-        amount = len(objects_angles)
-        previous_grid = self.get_cells_grids([30, 40], [offset_x, offset_y], 50, int(n_x), p_x, off2_x, int(n_y), p_x,
-                                             off2_y,
-                                             grid_angle)
+        windows = np.array([[[5, 45], [65, 5]], [[5, 75], [65, 35]], [[70, 75], [95, 5]], [[100, 40], [165, 5]],
+                            [[100, 75], [165, 45]]])
+        main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
 
-        grid = self.cut_by_rectagular(previous_grid, [20, 60], [70, 20])
-        centre_points = self.sorting_drops_bydistant(grid, [30, 40])[:amount]
-        rectangulars = self.get_objects_angle(amount, p_x, p_y, objects_angles)
-        rects = self.locate_objects(rectangulars, centre_points)
-
-        plt.plot(grid[:, 0], grid[:, 1], 'o')
-        for rect in rects:
-            x_list = np.append(rect[:, 0], rect[0, 0])
-            y_list = np.append(rect[:, 1], rect[0, 1])
-            plt.plot(x_list, y_list)
-
-        plt.show()
+        self.builder(gen, windows, main_points, 50)
         # self.bounds = np.array(self.bounds)
         # self.probability_mask = np.array(self.probability_mask)
         # print(self.probability_mask)
@@ -125,7 +106,7 @@ class Optimizer:
                 # else:
             big_gen.append(net_gen)
         # print(big_gen)
-        return big_gen
+        return np.array(big_gen, dtype='object')
 
     def test_function(self, x_vector):
         A = np.sum(x_vector[:][0])
@@ -167,12 +148,13 @@ class Optimizer:
                 xy_ = bases_grid_copy + [r_x * p_x, r_y * p_y]
                 bases_grid = np.append(bases_grid, xy_, axis=0)
         # print(bases_grid.shape)
-        bases_grid = self.ratation(bases_grid, deg)
+        if deg != 0:
+            bases_grid = self.ratation(bases_grid, deg)
         bases_grid = bases_grid + main_point
         bases_grid = bases_grid + offset_grid
         print(bases_grid.shape)
-        plt.plot(bases_grid[:, 0], bases_grid[:, 1], 'o')
-        plt.show()
+        #plt.plot(bases_grid[:, 0], bases_grid[:, 1], 'o')
+        #plt.show()
         return bases_grid
 
     def cut_by_rectagular(self, grid, up_left_cords, down_right_cords):
@@ -193,9 +175,14 @@ class Optimizer:
         return np.array(rotated_rects)
 
     def sorting_drops_bydistant(self, drops, main_point):
-        drops = np.unique(drops, axis= 0)
+        drops = np.unique(drops, axis=0)
         distant = ((drops[:, 0] - main_point[0]) ** 2 + (drops[:, 1] - main_point[1]) ** 2) ** 0.5
         return drops[np.argsort(distant)]
+
+    def get_centre_pints_opinion(self, drops, n, index):
+        n_drops = drops.shape[0]
+        offset = int(index * (n_drops - n))
+        return drops[offset:offset + n, :]
 
     def locate_objects(self, rects, centre_points):
         centre_points = centre_points[:, np.newaxis, :]
@@ -217,6 +204,37 @@ class Optimizer:
 
         return B
 
+    def builder(self, gen, windows, main_points, dioganal):
+        colors = ['red', 'blue', 'yellow', 'black', 'green']
+        colors = colors[:gen.shape[0]]
+        for chromosome, window, main_point, color in zip(gen, windows, main_points, colors):
+            grid = chromosome[0]
+            p_x, p_y = chromosome[0], chromosome[1]
+            offset_x, offset_y = chromosome[2], chromosome[3]
+            n_x, n_y = chromosome[4], chromosome[5]
+            off2_x, off2_y = chromosome[6], chromosome[7]
+            layout_ind = chromosome[9]
+            grid_angle = chromosome[8]
+            objects_angles = chromosome[10:]
+            amount = len(objects_angles)
+            previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], dioganal, int(n_x), p_x, off2_x,
+                                                 int(n_y), p_x, off2_y, grid_angle)
+            grid = self.cut_by_rectagular(previous_grid, window[0], window[1])
+            centre_points = self.sorting_drops_bydistant(grid, main_point)
+            centre_points = self.get_centre_pints_opinion(centre_points, amount, layout_ind)
+            rectangulars = self.get_objects_angle(amount, p_x, p_y, objects_angles)
+            rects = self.locate_objects(rectangulars, centre_points)
+
+
+            plt.axis('equal')
+            plt.plot(grid[:, 0], grid[:, 1], 'o')
+            for rect in rects:
+                x_list = np.append(rect[:, 0], rect[0, 0])
+                y_list = np.append(rect[:, 1], rect[0, 1])
+                plt.plot(x_list, y_list, color=color)
+
+        plt.show()
+
 
 if __name__ == "__main__":
     Classes = {
@@ -224,19 +242,19 @@ if __name__ == "__main__":
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                       "Classes_for_distant": {"Machine_tool": 8}},
-        'Printers': {"Amount": 3, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
-                     "Need_lighting": 9,
-                     "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
-                     "Classes_for_distant": {"Machine_tool": 9}},
-        'Cabinets': {"Amount": 4, "rectangular_x": 0.5, "rectangular_y": 2, 'Environment_x': 1.5, "Environment_y": 1,
-                     "Need_lighting": 6,
-                     "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
-                     "Classes_for_distant": {"Machine_tool": 5}},
-        'lamp': {"Amount": 60, "rectangular_x": 0.4, "rectangular_y": 0.4, 'Environment_x': 0.4, "Environment_y": 0.4,
-                 "Need_lighting": "reverse",
-                 "Classes_for_short_path": [None],
-                 "Classes_ignored_intersections": ["Workplace", "Printers", "Cabinets", "Machine_tool"],
-                 "Classes_for_distant": {None}},
+        # 'Printers': {"Amount": 3, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
+        #              "Need_lighting": 9,
+        #              "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
+        #              "Classes_for_distant": {"Machine_tool": 9}},
+        # 'Cabinets': {"Amount": 4, "rectangular_x": 0.5, "rectangular_y": 2, 'Environment_x': 1.5, "Environment_y": 1,
+        #              "Need_lighting": 6,
+        #              "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
+        #              "Classes_for_distant": {"Machine_tool": 5}},
+        # 'lamp': {"Amount": 60, "rectangular_x": 0.4, "rectangular_y": 0.4, 'Environment_x': 0.4, "Environment_y": 0.4,
+        #          "Need_lighting": "reverse",
+        #          "Classes_for_short_path": [None],
+        #          "Classes_ignored_intersections": ["Workplace", "Printers", "Cabinets", "Machine_tool"],
+        #          "Classes_for_distant": {None}},
         'Machine_tool': {"Amount": 4, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
                          "Need_lighting": 8,
                          "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
