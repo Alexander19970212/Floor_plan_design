@@ -27,9 +27,14 @@ class Optimizer:
         grid = self.cut_by_rectagular(previous_grid, [20, 60], [70, 20])
         centre_points = self.sorting_drops_bydistant(grid, [30, 40])[:amount]
         rectangulars = self.get_objects_angle(amount, p_x, p_y, objects_angles)
-        print(self.locate_objects(rectangulars, centre_points))
+        rects = self.locate_objects(rectangulars, centre_points)
 
         plt.plot(grid[:, 0], grid[:, 1], 'o')
+        for rect in rects:
+            x_list = np.append(rect[:, 0], rect[0, 0])
+            y_list = np.append(rect[:, 1], rect[0, 1])
+            plt.plot(x_list, y_list)
+
         plt.show()
         # self.bounds = np.array(self.bounds)
         # self.probability_mask = np.array(self.probability_mask)
@@ -188,12 +193,13 @@ class Optimizer:
         return np.array(rotated_rects)
 
     def sorting_drops_bydistant(self, drops, main_point):
+        drops = np.unique(drops, axis= 0)
         distant = ((drops[:, 0] - main_point[0]) ** 2 + (drops[:, 1] - main_point[1]) ** 2) ** 0.5
         return drops[np.argsort(distant)]
 
     def locate_objects(self, rects, centre_points):
         centre_points = centre_points[:, np.newaxis, :]
-        centre_points = np.repeat(centre_points, 4, axis=2)
+        centre_points = np.repeat(centre_points, 4, axis=1)
         return rects + centre_points
 
     def ratation(self, drops, deg):
