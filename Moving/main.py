@@ -4,6 +4,13 @@ import matplotlib.pyplot as plt
 from evolutionary_search import EvolSearch
 
 
+
+#  create matrix of minimal distant between classes
+#  debug distance between classes
+#  check sum by axis
+#  don't forget to get mask for mutation
+
+
 class Optimizer:
     def __init__(self, classes):
         self.Classes = classes
@@ -16,7 +23,8 @@ class Optimizer:
                             [[100, 75], [165, 45]]])
         main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
 
-        self.builder(gen, windows, main_points, 50)
+        obj_classes = self.builder(gen, windows, main_points, 50)
+        self.distant_between_classes() ############################################################################3
         # self.bounds = np.array(self.bounds)
         # self.probability_mask = np.array(self.probability_mask)
         # print(self.probability_mask)
@@ -153,8 +161,8 @@ class Optimizer:
         bases_grid = bases_grid + main_point
         bases_grid = bases_grid + offset_grid
         print(bases_grid.shape)
-        #plt.plot(bases_grid[:, 0], bases_grid[:, 1], 'o')
-        #plt.show()
+        # plt.plot(bases_grid[:, 0], bases_grid[:, 1], 'o')
+        # plt.show()
         return bases_grid
 
     def cut_by_rectagular(self, grid, up_left_cords, down_right_cords):
@@ -207,6 +215,8 @@ class Optimizer:
     def builder(self, gen, windows, main_points, dioganal):
         colors = ['red', 'blue', 'yellow', 'black', 'green']
         colors = colors[:gen.shape[0]]
+
+        object_class = []
         for chromosome, window, main_point, color in zip(gen, windows, main_points, colors):
             grid = chromosome[0]
             p_x, p_y = chromosome[0], chromosome[1]
@@ -225,7 +235,6 @@ class Optimizer:
             rectangulars = self.get_objects_angle(amount, p_x, p_y, objects_angles)
             rects = self.locate_objects(rectangulars, centre_points)
 
-
             plt.axis('equal')
             plt.plot(grid[:, 0], grid[:, 1], 'o')
             for rect in rects:
@@ -233,7 +242,39 @@ class Optimizer:
                 y_list = np.append(rect[:, 1], rect[0, 1])
                 plt.plot(x_list, y_list, color=color)
 
+            object_class.append(rects)
+
         plt.show()
+        return object_class
+
+    def distant_between_two_classes(self, rects_1, rects_2):
+        amount_rects_1 = rects_1.shape[0]
+        amount_rects_2 = rects_2.shape[0]
+        rects_1_matrix = rects_1[np.newaxis, :, :, :]
+        rects_2_matrix = rects_2[np.newaxis, :, :, :]
+
+        rects_1_matrix = np.repeat(rects_1_matrix, amount_rects_2, axis=0)
+        rects_2_matrix = np.repeat(rects_2_matrix, amount_rects_1, axis=0)
+
+        x_distances = rects_1_matrix[:, :, :, 0] - rects_2_matrix[:, :, :, 0]
+        y_distances = rects_1_matrix[:, :, :, 1] - rects_2_matrix[:, :, :, 1]
+
+        distances = (x_distances**2 + y_distances**2)**0.5
+
+        return distances
+
+    def distant_between_classes(self, rects_classes, minimal_distances):
+        object_distant = 0
+        number_classes = rects_classes.shape[0]
+        for i in range(number_classes):
+            for j in range(number_classes):
+                if i != j:
+                    distances = self.distant_between_two_classes(rects_classes[i], rects_classes[j])
+                    distances_mistake = (distances < minimal_distances[i, j])*1
+                    distances_mistake = np.sum(distances_mistake, axis=1)
+
+
+
 
 
 if __name__ == "__main__":
