@@ -5,7 +5,6 @@ from evolutionary_search import EvolSearch
 
 
 
-#  create matrix of minimal distant between classes
 #  debug distance between classes
 #  check sum by axis
 #  don't forget to get mask for mutation
@@ -24,7 +23,8 @@ class Optimizer:
         main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
 
         obj_classes = self.builder(gen, windows, main_points, 50)
-        self.distant_between_classes() ############################################################################3
+        mat_dist = self.get_minimal_dist_mat()
+        self.distant_between_classes(obj_classes, mat_dist)
         # self.bounds = np.array(self.bounds)
         # self.probability_mask = np.array(self.probability_mask)
         # print(self.probability_mask)
@@ -68,6 +68,23 @@ class Optimizer:
         # # print results
         # print('Max fitness of population = ', es.get_best_individual_fitness())
         # print('Best individual in population = ', es.get_best_individual())
+
+    def get_minimal_dist_mat(self):
+        minimal_distances = []
+        for class_1 in self.Classes:
+            min_dist_one_axies = []
+            for class_2 in self.Classes:
+                if class_1 != class_2:
+                    try:
+                        dist = self.Classes[class_1]["Classes_for_distant"][class_2]
+                    except:
+                        dist = 0
+                else:
+                    dist = 0
+                min_dist_one_axies.append(dist)
+            minimal_distances.append( min_dist_one_axies)
+
+        return np.array(minimal_distances)
 
     def bounds_constructor(self):
         for kind in self.Classes:
@@ -245,7 +262,7 @@ class Optimizer:
             object_class.append(rects)
 
         plt.show()
-        return object_class
+        return np.array(object_class, dtype='object')
 
     def distant_between_two_classes(self, rects_1, rects_2):
         amount_rects_1 = rects_1.shape[0]
@@ -256,14 +273,15 @@ class Optimizer:
         rects_1_matrix = np.repeat(rects_1_matrix, amount_rects_2, axis=0)
         rects_2_matrix = np.repeat(rects_2_matrix, amount_rects_1, axis=0)
 
-        x_distances = rects_1_matrix[:, :, :, 0] - rects_2_matrix[:, :, :, 0]
-        y_distances = rects_1_matrix[:, :, :, 1] - rects_2_matrix[:, :, :, 1]
+        x_distances = rects_1_matrix[:, :, :, 0] - rects_2_matrix[:, :, :, 0].transpose((1, 0, 2))
+        y_distances = rects_1_matrix[:, :, :, 1] - rects_2_matrix[:, :, :, 1].transpose((1, 0, 2))
 
         distances = (x_distances**2 + y_distances**2)**0.5
 
         return distances
 
     def distant_between_classes(self, rects_classes, minimal_distances):
+        print(minimal_distances)
         object_distant = 0
         number_classes = rects_classes.shape[0]
         for i in range(number_classes):
