@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from evolutionary_search import EvolSearch
 
 
-
 #  debug distance between classes
 #  check sum by axis
 #  don't forget to get mask for mutation
@@ -18,11 +17,11 @@ class Optimizer:
         self.bounds_constructor()
         self.probability_mask_constructor()
         gen = self.gen_constructor()
-        windows = np.array([[[5, 45], [65, 5]], [[5, 75], [65, 35]], [[70, 75], [95, 5]], [[100, 40], [165, 5]],
+        windows = np.array([[[5, 50], [50, 5]], [[5, 50], [50, 5]], [[5, 55], [55, 5]], [[100, 40], [165, 5]],
                             [[100, 75], [165, 45]]])
         main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
 
-        obj_classes = self.builder(gen, windows, main_points, 50)
+        obj_classes = self.builder(gen, windows, main_points, 150)
         mat_dist = self.get_minimal_dist_mat()
         self.distant_between_classes(obj_classes, mat_dist)
         # self.bounds = np.array(self.bounds)
@@ -82,7 +81,7 @@ class Optimizer:
                 else:
                     dist = 0
                 min_dist_one_axies.append(dist)
-            minimal_distances.append( min_dist_one_axies)
+            minimal_distances.append(min_dist_one_axies)
 
         return np.array(minimal_distances)
 
@@ -92,8 +91,8 @@ class Optimizer:
                                 [self.Classes[kind]['Environment_y'], self.Classes[kind]['Environment_y'] * 2],
                                 [0, self.Classes[kind]['Environment_x']], [0, self.Classes[kind]['Environment_y']],
                                 [1, 10], [1, 10],
-                                [self.Classes[kind]['Environment_x'] * 2, self.Classes[kind]['Environment_x'] * 10],
-                                [self.Classes[kind]['Environment_y'] * 2, self.Classes[kind]['Environment_y'] * 10],
+                                [self.Classes[kind]['Environment_x'] * 1.5, self.Classes[kind]['Environment_x'] * 3],
+                                [self.Classes[kind]['Environment_y'] * 1.5, self.Classes[kind]['Environment_y'] * 3],
                                 [0, 45, 90], [0, 1]]
             for drop in range(0, self.Classes[kind]["Amount"]):
                 layer_parameters.append([0, 45, 90])
@@ -101,10 +100,13 @@ class Optimizer:
 
     def probability_mask_constructor(self):
         for kind in self.Classes:
-            layer_parameters = [0, 0, 0, 0, 0.5, 0.5,
-                                'Equally_distributed', 'Equally_distributed',
-                                'Equally_distributed', 'Equally_distributed',
-                                [0.4, 0.2, 0.4], 0]
+            layer_parameters = [0, 0,  # P_x, P_y
+                                0, 0,  # Offset_x, Offset_y from main point
+                                0.5, 0.5,  # N_x, N_y
+                                'Equally_distributed', 'Equally_distributed',  # offsets from points group
+                                #'Equally_distributed', 'Equally_distributed',
+                                [0.4, 0.2, 0.4],  # grid angle
+                                0]  #
             for drop in range(0, self.Classes[kind]["Amount"]):
                 layer_parameters.append([0.4, 0.2, 0.4])
             self.probability_mask.append(layer_parameters)
@@ -174,6 +176,7 @@ class Optimizer:
                 bases_grid = np.append(bases_grid, xy_, axis=0)
         # print(bases_grid.shape)
         if deg != 0:
+            print("Deg", deg)
             bases_grid = self.ratation(bases_grid, deg)
         bases_grid = bases_grid + main_point
         bases_grid = bases_grid + offset_grid
@@ -195,7 +198,10 @@ class Optimizer:
         rects = np.repeat(rects, amount, axis=0)
         rotated_rects = []
         for rect, angle in zip(rects, rotation_list):
-            rotated_rects.append(self.ratation(rect, angle))
+            if angle == 0:
+                rotated_rects.append(self.ratation(rect, angle))
+            else:
+                rotated_rects.append(rect)
 
         return np.array(rotated_rects)
 
@@ -242,6 +248,7 @@ class Optimizer:
             off2_x, off2_y = chromosome[6], chromosome[7]
             layout_ind = chromosome[9]
             grid_angle = chromosome[8]
+            print("Grid_angle", grid_angle)
             objects_angles = chromosome[10:]
             amount = len(objects_angles)
             previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], dioganal, int(n_x), p_x, off2_x,
@@ -276,7 +283,7 @@ class Optimizer:
         x_distances = rects_1_matrix[:, :, :, 0] - rects_2_matrix[:, :, :, 0].transpose((1, 0, 2))
         y_distances = rects_1_matrix[:, :, :, 1] - rects_2_matrix[:, :, :, 1].transpose((1, 0, 2))
 
-        distances = (x_distances**2 + y_distances**2)**0.5
+        distances = (x_distances ** 2 + y_distances ** 2) ** 0.5
 
         return distances
 
@@ -284,15 +291,30 @@ class Optimizer:
         print(minimal_distances)
         object_distant = 0
         number_classes = rects_classes.shape[0]
+        broken_gens = []
         for i in range(number_classes):
+            broken_gen = []
             for j in range(number_classes):
                 if i != j:
                     distances = self.distant_between_two_classes(rects_classes[i], rects_classes[j])
-                    distances_mistake = (distances < minimal_distances[i, j])*1
-                    distances_mistake = np.sum(distances_mistake, axis=1)
+                    distances_mistake = (distances < minimal_distances[i, j]) * 1
+                    distances_mistake = np.sum(distances_mistake, axis=2)
+                    distances_mistake = np.sum(distances_mistake, axis=0)
+                    broken_gen.append(distances_mistake)
+                    object_distant += np.sum(distances)
+            broken_gens.append(broken_gen)
 
+        if number_classes >= 3:
+            result_broken_gen = np.sum(broken_gens, axis=1)
+        else:
+            result_broken_gen = broken_gens
 
+        object_distant_value = 0
+        for chromasome_index in range(number_classes):
+            object_distant_value += np.sum(result_broken_gen[chromasome_index])
+            result_broken_gen[chromasome_index] = (result_broken_gen[chromasome_index] >= 1) * 1
 
+        return object_distant_value, result_broken_gen
 
 
 if __name__ == "__main__":
@@ -300,11 +322,11 @@ if __name__ == "__main__":
         'Workplace': {"Amount": 12, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
-                      "Classes_for_distant": {"Machine_tool": 8}},
-        # 'Printers': {"Amount": 3, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
-        #              "Need_lighting": 9,
-        #              "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
-        #              "Classes_for_distant": {"Machine_tool": 9}},
+                      "Classes_for_distant": {"Machine_tool": 40}},
+        'Printers': {"Amount": 3, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
+                     "Need_lighting": 9,
+                     "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
+                     "Classes_for_distant": {"Machine_tool": 30}},
         # 'Cabinets': {"Amount": 4, "rectangular_x": 0.5, "rectangular_y": 2, 'Environment_x': 1.5, "Environment_y": 1,
         #              "Need_lighting": 6,
         #              "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
@@ -317,7 +339,7 @@ if __name__ == "__main__":
         'Machine_tool': {"Amount": 4, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
                          "Need_lighting": 8,
                          "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
-                         "Classes_for_distant": {"Workplace": 8, "Printers": 9, "Cabinets": 5}}
+                         "Classes_for_distant": {"Workplace": 40, "Printers": 30, "Cabinets": 5}}
     }
 
     Opt = Optimizer(Classes)
