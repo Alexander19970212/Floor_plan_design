@@ -4,9 +4,14 @@ import matplotlib.pyplot as plt
 from evolutionary_search import EvolSearch
 
 
-#  debug distance between classes
-#  check sum by axis
-#  don't forget to get mask for mutation
+#  debug distance between classes+
+#  check sum by axis+
+#  don't forget to get mask for mutation+
+
+#  artist function
+#  result drowing function
+#  save minimal for each dynasty
+#  right gen code for minimal fitness function
 
 
 class Optimizer:
@@ -23,7 +28,8 @@ class Optimizer:
 
         obj_classes = self.builder(gen, windows, main_points, 150)
         mat_dist = self.get_minimal_dist_mat()
-        self.distant_between_classes(obj_classes, mat_dist)
+        object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
+        self.constructor_broken_gen(result_broken_gen, gen)
         # self.bounds = np.array(self.bounds)
         # self.probability_mask = np.array(self.probability_mask)
         # print(self.probability_mask)
@@ -315,6 +321,22 @@ class Optimizer:
             result_broken_gen[chromasome_index] = (result_broken_gen[chromasome_index] >= 1) * 1
 
         return object_distant_value, result_broken_gen
+
+    def constructor_broken_gen(self, parts_gen, example_gen):
+        #  temprorary
+        mask_gen = []
+        for chromosome, broken_part in zip(example_gen, parts_gen):
+            void_gen = np.zeros_like(chromosome)
+            void_gen[void_gen.shape[0]-broken_part.shape[0]:] = broken_part
+            if np.sum(broken_part) >= 0.5*broken_part.shape[0]:
+                void_gen[9] = 1
+            mask_gen.append(void_gen)
+
+        return mask_gen
+
+    def  artist(self, gen, name):
+        pass
+
 
 
 if __name__ == "__main__":
