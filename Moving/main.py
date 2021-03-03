@@ -110,7 +110,7 @@ class Optimizer:
                                 0, 0,  # Offset_x, Offset_y from main point
                                 0.5, 0.5,  # N_x, N_y
                                 'Equally_distributed', 'Equally_distributed',  # offsets from points group
-                                #'Equally_distributed', 'Equally_distributed',
+                                # 'Equally_distributed', 'Equally_distributed',
                                 [0.4, 0.2, 0.4],  # grid angle
                                 0]  #
             for drop in range(0, self.Classes[kind]["Amount"]):
@@ -327,15 +327,74 @@ class Optimizer:
         mask_gen = []
         for chromosome, broken_part in zip(example_gen, parts_gen):
             void_gen = np.zeros_like(chromosome)
-            void_gen[void_gen.shape[0]-broken_part.shape[0]:] = broken_part
-            if np.sum(broken_part) >= 0.5*broken_part.shape[0]:
+            void_gen[void_gen.shape[0] - broken_part.shape[0]:] = broken_part
+            if np.sum(broken_part) >= 0.5 * broken_part.shape[0]:
                 void_gen[9] = 1
             mask_gen.append(void_gen)
 
         return mask_gen
 
-    def  artist(self, gen, name):
-        pass
+    def artist(self, filename_gens, filename_values, number_points_floor_plan, number_points_plots):
+        dynasties_values = []
+        with open(filename_values, "r") as file:
+            for line in file:
+                dynasties_values.append(line.split())
+
+        dynasties_values = np.float_(dynasties_values)
+
+        ################################################################################
+        # write drowing values subplots
+
+
+        fig, ax = plt.subplots(2)
+        ax[1].set_xlim(0, length)
+        for i, bl_cl in enumerate(self.blok_cl):
+            color_set = 'b'
+            if i == 1:
+                color_set = 'k'
+            elif i == 2:
+                color_set = 'c'
+            for cs in bl_cl:
+                ax[0].scatter(self.points_block_x[cs[0]:cs[1]], self.points_block_y[cs[0]:cs[1]],
+                              color=color_set)
+
+        # ax[0].scatter(self.points_block_x, self.points_block_y)
+        for i, cl_raw in enumerate(self.indexs_cl):
+            color_set = 'y'
+            if i == 1:
+                color_set = 'g'
+            elif i == 2:
+                color_set = 'r'
+            ax[0].scatter(self.points_obj_x[cl_raw[0]:cl_raw[1] + 1],
+                          self.points_obj_y[cl_raw[0]:cl_raw[1] + 1], color=color_set)
+        ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max", color='g')
+        ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max", color='r')
+
+        # ax[1].text(480, 10, t)
+        ax[1].legend()
+
+        fig.savefig(f"Scrins/band{t}.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
+
+    def save_dynasties(self, values, filename="Dynasties_values"):
+        try:
+            with open(filename, "a") as file_values:
+                file_values.write('\n')
+                file_values.write(values)
+        except:
+            with open(filename, "w") as file_values:
+                file_values.write(values)
+
+    def save_best_gen(self, gen, filename="Gens"):
+        try:
+            with open(filename, "a") as file_values:
+                file_values.write('\n')
+                file_values.write(gen)
+        except:
+            with open(filename, "w") as file_values:
+                file_values.write(gen)
+
+
 
 
 
