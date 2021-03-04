@@ -26,53 +26,53 @@ class Optimizer:
                             [[100, 75], [165, 45]]])
         main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
 
-        obj_classes = self.builder(gen, windows, main_points, 150)
-        mat_dist = self.get_minimal_dist_mat()
-        object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
-        self.constructor_broken_gen(result_broken_gen, gen)
-        # self.bounds = np.array(self.bounds)
-        # self.probability_mask = np.array(self.probability_mask)
+        # obj_classes = self.builder(gen, windows, main_points, 150)
+        # mat_dist = self.get_minimal_dist_mat()
+        # object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
+        # self.constructor_broken_gen(result_broken_gen, gen)
+        self.bounds = np.array(self.bounds, dtype="object")
+        self.probability_mask = np.array(self.probability_mask, dtype="object")
         # print(self.probability_mask)
         # gen = self.gen_constructor()
         # koef = self.calibration_function(gen)
         # new_gen = self.gen_constructor()
         # result = self.fitness_function(new_gen, koef)
 
-        # evol_params = {
-        #     'num_processes': 4,  # (optional) number of proccesses for multiprocessing.Pool
-        #     'pop_size': 200,  # population size
-        #     'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
-        #     'calibration_function': self.calibration_function,
-        #     'elitist_fraction': 2,  # fraction of population retained as is between generations
-        #     'bounds': self.bounds,
-        #     'probability_mask': self.probability_mask,
-        #     'num_branches': 3
-        # }
-        #
-        # es = EvolSearch(evol_params)
-        #
-        # '''OPTION 1
-        # # execute the search for 100 generations
-        # num_gens = 100
-        # es.execute_search(num_gens)
-        # '''
-        #
-        # '''OPTION 2'''
-        # # keep searching till a stopping condition is reached
-        # num_gen = 0
-        # max_num_gens = 102
-        # desired_fitness = 0.05
-        # es.step_generation()
-        # print(es.get_best_individual_fitness())
-        # print(es.get_best_individual_fitness() > desired_fitness) # and num_gen > max_num_gens)
-        # while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
-        #     print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
-        #     es.step_generation()
-        #     num_gen += 1
-        #
-        # # print results
-        # print('Max fitness of population = ', es.get_best_individual_fitness())
-        # print('Best individual in population = ', es.get_best_individual())
+        evol_params = {
+            'num_processes': 4,  # (optional) number of proccesses for multiprocessing.Pool
+            'pop_size': 200,  # population size
+            'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
+            'calibration_function': self.calibration_function,
+            'elitist_fraction': 2,  # fraction of population retained as is between generations
+            'bounds': self.bounds,
+            'probability_mask': self.probability_mask,
+            'num_branches': 3
+        }
+
+        es = EvolSearch(evol_params)
+
+        '''OPTION 1
+        # execute the search for 100 generations
+        num_gens = 100
+        es.execute_search(num_gens)
+        '''
+
+        '''OPTION 2'''
+        # keep searching till a stopping condition is reached
+        num_gen = 0
+        max_num_gens = 102
+        desired_fitness = 0.05
+        es.step_generation()
+        print(es.get_best_individual_fitness())
+        print(es.get_best_individual_fitness() > desired_fitness) # and num_gen > max_num_gens)
+        while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
+            print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
+            es.step_generation()
+            num_gen += 1
+
+        # print results
+        print('Max fitness of population = ', es.get_best_individual_fitness())
+        print('Best individual in population = ', es.get_best_individual())
 
     def get_minimal_dist_mat(self):
         minimal_distances = []
@@ -141,28 +141,34 @@ class Optimizer:
         # print(big_gen)
         return np.array(big_gen, dtype='object')
 
-    def test_function(self, x_vector):
-        A = np.sum(x_vector[:][0])
-        B = np.sum(x_vector[:][1])
-        C = np.sum(x_vector[:][2])
-        D = np.sum(x_vector[:][3])
-        # print([A, B, C, D])
-        return np.array([A, B, C, D])
+    def test_function(self, gen):
+        windows = np.array([[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
+                            [[100, 75], [165, 45]]])
+        main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
+        obj_classes = self.builder(gen, windows, main_points, 150)
+        mat_dist = self.get_minimal_dist_mat()
+        object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist)
+        # print('Distance', object_distant_value)
+        mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
+
+        return np.array([object_distant_value, dist_value]), mask
 
     def calibration_function(self, x_vector):
         x_vector = np.array(x_vector, dtype="object")
         # print(x_vector)
-        return self.test_function(x_vector)
+        penalties, mask = self.test_function(x_vector)
+        return penalties
 
     def fitness_function(self, gen, koef):
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.3, 0.3, 0.2, 0.2])
-        D = self.test_function(x_vector)
-        result = np.sum(test_attention * D / koef)
+        test_attention = np.array([0.4, 0.6])
+        D, mask = self.test_function(x_vector)
+        #print(D)
         mask = []
         for grid in gen:
             mask.append(np.ones_like(np.array(grid)))
-        # print(result)
+
+        result = np.sum(test_attention * D / koef)
         return [result, np.array(mask, dtype='object')]
 
     def get_cells_grids(self, main_point, offset_grid, max_rad, n_x, p_x, dist_x, n_y, p_y, dist_y, deg):
@@ -182,11 +188,11 @@ class Optimizer:
                 bases_grid = np.append(bases_grid, xy_, axis=0)
         # print(bases_grid.shape)
         if deg != 0:
-            print("Deg", deg)
+            #print("Deg", deg)
             bases_grid = self.ratation(bases_grid, deg)
         bases_grid = bases_grid + main_point
         bases_grid = bases_grid + offset_grid
-        print(bases_grid.shape)
+        #print(bases_grid.shape)
         # plt.plot(bases_grid[:, 0], bases_grid[:, 1], 'o')
         # plt.show()
         return bases_grid
@@ -254,7 +260,7 @@ class Optimizer:
             off2_x, off2_y = chromosome[6], chromosome[7]
             layout_ind = chromosome[9]
             grid_angle = chromosome[8]
-            print("Grid_angle", grid_angle)
+            #print("Grid_angle", grid_angle)
             objects_angles = chromosome[10:]
             amount = len(objects_angles)
             previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], dioganal, int(n_x), p_x, off2_x,
@@ -265,16 +271,16 @@ class Optimizer:
             rectangulars = self.get_objects_angle(amount, p_x, p_y, objects_angles)
             rects = self.locate_objects(rectangulars, centre_points)
 
-            plt.axis('equal')
-            plt.plot(grid[:, 0], grid[:, 1], 'o')
-            for rect in rects:
-                x_list = np.append(rect[:, 0], rect[0, 0])
-                y_list = np.append(rect[:, 1], rect[0, 1])
-                plt.plot(x_list, y_list, color=color)
+            # plt.axis('equal')
+            # plt.plot(grid[:, 0], grid[:, 1], 'o')
+            # for rect in rects:
+            #     x_list = np.append(rect[:, 0], rect[0, 0])
+            #     y_list = np.append(rect[:, 1], rect[0, 1])
+            #     plt.plot(x_list, y_list, color=color)
 
             object_class.append(rects)
 
-        plt.show()
+        #  plt.show()
         return np.array(object_class, dtype='object')
 
     def distant_between_two_classes(self, rects_1, rects_2):
@@ -294,7 +300,7 @@ class Optimizer:
         return distances
 
     def distant_between_classes(self, rects_classes, minimal_distances):
-        print(minimal_distances)
+        #print(minimal_distances)
         object_distant = 0
         number_classes = rects_classes.shape[0]
         broken_gens = []
@@ -320,19 +326,21 @@ class Optimizer:
             object_distant_value += np.sum(result_broken_gen[chromasome_index])
             result_broken_gen[chromasome_index] = (result_broken_gen[chromasome_index] >= 1) * 1
 
-        return object_distant_value, result_broken_gen
+        return object_distant_value, result_broken_gen, object_distant
 
     def constructor_broken_gen(self, parts_gen, example_gen):
         #  temprorary
+        amount_intersections = 0
         mask_gen = []
         for chromosome, broken_part in zip(example_gen, parts_gen):
             void_gen = np.zeros_like(chromosome)
             void_gen[void_gen.shape[0] - broken_part.shape[0]:] = broken_part
+            amount_intersections += np.sum(broken_part)
             if np.sum(broken_part) >= 0.5 * broken_part.shape[0]:
                 void_gen[9] = 1
             mask_gen.append(void_gen)
 
-        return mask_gen
+        return mask_gen, amount_intersections
 
     def artist(self, filename_gens, filename_values, number_points_floor_plan, number_points_plots):
         dynasties_values = []
@@ -347,7 +355,7 @@ class Optimizer:
 
 
         fig, ax = plt.subplots(2)
-        ax[1].set_xlim(0, length)
+        # ax[1].set_xlim(0, length)
         for i, bl_cl in enumerate(self.blok_cl):
             color_set = 'b'
             if i == 1:
@@ -373,7 +381,7 @@ class Optimizer:
         # ax[1].text(480, 10, t)
         ax[1].legend()
 
-        fig.savefig(f"Scrins/band{t}.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
+        # fig.savefig(f"Scrins/band{t}.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
         plt.close(fig)
 
     def save_dynasties(self, values, filename="Dynasties_values"):
@@ -407,7 +415,7 @@ if __name__ == "__main__":
         'Printers': {"Amount": 3, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
                      "Need_lighting": 9,
                      "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
-                     "Classes_for_distant": {"Machine_tool": 30}},
+                     "Classes_for_distant": {"Machine_tool": 50}},
         # 'Cabinets': {"Amount": 4, "rectangular_x": 0.5, "rectangular_y": 2, 'Environment_x': 1.5, "Environment_y": 1,
         #              "Need_lighting": 6,
         #              "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
@@ -420,7 +428,7 @@ if __name__ == "__main__":
         'Machine_tool': {"Amount": 4, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
                          "Need_lighting": 8,
                          "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
-                         "Classes_for_distant": {"Workplace": 40, "Printers": 30, "Cabinets": 5}}
+                         "Classes_for_distant": {"Workplace": 40, "Printers": 50, "Cabinets": 5}}
     }
 
     Opt = Optimizer(Classes)
