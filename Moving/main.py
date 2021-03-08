@@ -2,6 +2,7 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 from evolutionary_search import EvolSearch
+from PIL import Image
 
 
 #  debug distance between classes+
@@ -23,8 +24,9 @@ class Optimizer:
         self.probability_mask_constructor()
         gen = self.gen_constructor()
 
-        self.windows = np.array([[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
-                            [[100, 75], [165, 45]]])
+        self.windows = np.array(
+            [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
+             [[100, 75], [165, 45]]])
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
 
         # obj_classes = self.builder(gen, windows, main_points, 150)
@@ -65,15 +67,19 @@ class Optimizer:
         desired_fitness = 0.05
         es.step_generation()
         print(es.get_best_individual_fitness())
-        print(es.get_best_individual_fitness() > desired_fitness) # and num_gen > max_num_gens)
+        print(es.get_best_individual_fitness() > desired_fitness)  # and num_gen > max_num_gens)
         while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
             print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
             es.step_generation()
+            self.save_best_gen(es.get_best_individual(), "test_gens.txt")
+            self.save_dynasties(es.get_dynasties_best_value(), 'test_values.txt')
             num_gen += 1
 
         # print results
         print('Max fitness of population = ', es.get_best_individual_fitness())
         print('Best individual in population = ', es.get_best_individual())
+
+        self.artist("test_gens.txt", 'test_values.txt')
 
     def get_minimal_dist_mat(self):
         minimal_distances = []
@@ -161,7 +167,7 @@ class Optimizer:
         x_vector = np.array(gen, dtype="object")
         test_attention = np.array([0.4, 0.6])
         D, mask = self.test_function(x_vector)
-        #print(D)
+        # print(D)
         mask = []
         for grid in gen:
             mask.append(np.ones_like(np.array(grid)))
@@ -186,11 +192,11 @@ class Optimizer:
                 bases_grid = np.append(bases_grid, xy_, axis=0)
         # print(bases_grid.shape)
         if deg != 0:
-            #print("Deg", deg)
+            # print("Deg", deg)
             bases_grid = self.ratation(bases_grid, deg)
         bases_grid = bases_grid + main_point
         bases_grid = bases_grid + offset_grid
-        #print(bases_grid.shape)
+        # print(bases_grid.shape)
         # plt.plot(bases_grid[:, 0], bases_grid[:, 1], 'o')
         # plt.show()
         return bases_grid
@@ -258,7 +264,7 @@ class Optimizer:
             off2_x, off2_y = chromosome[6], chromosome[7]
             layout_ind = chromosome[9]
             grid_angle = chromosome[8]
-            #print("Grid_angle", grid_angle)
+            # print("Grid_angle", grid_angle)
             objects_angles = chromosome[10:]
             amount = len(objects_angles)
             previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], dioganal, int(n_x), p_x, off2_x,
@@ -298,7 +304,7 @@ class Optimizer:
         return distances
 
     def distant_between_classes(self, rects_classes, minimal_distances):
-        #print(minimal_distances)
+        # print(minimal_distances)
         object_distant = 0
         number_classes = rects_classes.shape[0]
         broken_gens = []
@@ -340,7 +346,7 @@ class Optimizer:
 
         return mask_gen, amount_intersections
 
-    def artist(self, filename_gens, filename_values, number_points_floor_plan, number_points_plots):
+    def artist(self, filename_gens, filename_values, gif_time=10, type_draw="all"):
         dynasties_values = []
         with open(filename_values, "r") as file:
             for line in file:
@@ -372,45 +378,28 @@ class Optimizer:
 
             fig.savefig(f"Scrins/band{i}.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
 
-        ################################################################################
-        # write drowing values subplots
+            plt.close(fig)
 
+        if type_draw == 'all':
+            print('Udate Images')
+            names = [f"Scrins/band{band}.jpg" for band in range(0, gens.shape(0), 10)]
+            images = [Image.open(f) for f in names]
+            images = [image.convert("P", palette=Image.ADAPTIVE) for image in images]
+            fp_out = "image.gif"
+            print('Creating GIF')
 
-        fig, ax = plt.subplots(2)
-        # ax[1].set_xlim(0, length)
-        for i, bl_cl in enumerate(self.blok_cl):
-            color_set = 'b'
-            if i == 1:
-                color_set = 'k'
-            elif i == 2:
-                color_set = 'c'
-            for cs in bl_cl:
-                ax[0].scatter(self.points_block_x[cs[0]:cs[1]], self.points_block_y[cs[0]:cs[1]],
-                              color=color_set)
-
-        # ax[0].scatter(self.points_block_x, self.points_block_y)
-        for i, cl_raw in enumerate(self.indexs_cl):
-            color_set = 'y'
-            if i == 1:
-                color_set = 'g'
-            elif i == 2:
-                color_set = 'r'
-            ax[0].scatter(self.points_obj_x[cl_raw[0]:cl_raw[1] + 1],
-                          self.points_obj_y[cl_raw[0]:cl_raw[1] + 1], color=color_set)
-        ax[1].plot(self.x_axis, self.force_block_max, label="Force_block_max", color='g')
-        ax[1].plot(self.x_axis, self.force_loc_max, label="Force_loc_max", color='r')
-
-        # ax[1].text(480, 10, t)
-        ax[1].legend()
-
-        # fig.savefig(f"Scrins/band{t}.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
-        plt.close(fig)
+            img = images[0]
+            img.save(fp=fp_out, format="GIF", append_images=images[1:], save_all=True,
+                     duration=int(gif_time / gens.shape[0]),
+                     loop=0)
 
     def save_dynasties(self, values, filename="Dynasties_values"):
         try:
             with open(filename, "a") as file_values:
                 file_values.write('\n')
-                file_values.write(values)
+                for item in gen:
+                    file_values.write("%s\t" % item)
+
         except:
             with open(filename, "w") as file_values:
                 file_values.write(values)
@@ -419,13 +408,13 @@ class Optimizer:
         try:
             with open(filename, "a") as file_values:
                 file_values.write('\n')
-                file_values.write(gen)
+                for item in gen:
+                    file_values.write("%s\t" % item)
+
         except:
             with open(filename, "w") as file_values:
-                file_values.write(gen)
-
-
-
+                for item in gen:
+                    file_values.write("%s\t" % item)
 
 
 if __name__ == "__main__":

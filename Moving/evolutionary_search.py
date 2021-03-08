@@ -44,6 +44,8 @@ class EvolSearch:
         # create other required data
         self.coefficients = None
         self.num_processes = evol_params.get('num_processes', None)
+        self.dynasties_best_values = []
+        self.best_gen = None
 
         # check for fitness function kwargs
         if 'fitness_args' in evol_params.keys():
@@ -225,6 +227,11 @@ class EvolSearch:
 
         new_pop = []  # void list for new population
         number_dynasty = 0  # counter of dynasties
+        self.dynasties_best_values = []
+
+        # save best gen
+        best_index = np.argsort(self.fitness * (-1))[-1:]
+        self.dynasties_best_values.append(self.pop[best_index])
 
         # work over each dynasty separately
         for pop, fitness, mask_broken in zip(self.dynasties_pop, self.dynasties_fitness, self.dynasty_mask_broken):
@@ -234,6 +241,10 @@ class EvolSearch:
             # initial of parents
             parents_indexes = np.argsort(fitness * (-1))[-self.elitist_fraction:]  # select parents
             bufer_pop = pop[parents_indexes, :]
+
+            #  saving best value
+            best_index = np.argsort(fitness * (-1))[-1:]
+            self.dynasties_best_values.append(fitness[best_index])
 
             _mask = mask_broken[parents_indexes]  # define mask for mutation for parents
 
@@ -298,6 +309,9 @@ class EvolSearch:
         simply return all fitness values of current population
         '''
         return self.fitness
+
+    def get_dynasties_best_value(self):
+        return self.dynasties_best_values
 
     def get_best_individual(self):
         '''
