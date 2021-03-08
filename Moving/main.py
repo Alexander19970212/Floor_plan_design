@@ -22,9 +22,10 @@ class Optimizer:
         self.bounds_constructor()
         self.probability_mask_constructor()
         gen = self.gen_constructor()
-        windows = np.array([[[5, 50], [50, 5]], [[5, 50], [50, 5]], [[5, 55], [55, 5]], [[100, 40], [165, 5]],
+
+        self.windows = np.array([[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
                             [[100, 75], [165, 45]]])
-        main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
+        self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
 
         # obj_classes = self.builder(gen, windows, main_points, 150)
         # mat_dist = self.get_minimal_dist_mat()
@@ -142,10 +143,7 @@ class Optimizer:
         return np.array(big_gen, dtype='object')
 
     def test_function(self, gen):
-        windows = np.array([[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
-                            [[100, 75], [165, 45]]])
-        main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
-        obj_classes = self.builder(gen, windows, main_points, 150)
+        obj_classes = self.builder(gen, self.windows, self.main_points, 150)
         mat_dist = self.get_minimal_dist_mat()
         object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist)
         # print('Distance', object_distant_value)
@@ -349,6 +347,30 @@ class Optimizer:
                 dynasties_values.append(line.split())
 
         dynasties_values = np.float_(dynasties_values)
+
+        gens = []
+        with open(filename_gens, "r") as file:
+            for line in file:
+                gens.append(line.split())
+
+        gens = np.float_(gens)
+
+        fig, axs = plt.subplots(2)
+        axs[0].axis('equal')
+        axs[1].set_xlim(0, gens.shape[0])
+
+        for gen, values, i in zip(gens, dynasties_values, range(gens.shape[0])):
+            obj_classes = self.builder(gen, self.windows, self.main_points, 150)
+            for rect_class in obj_classes:
+                for rect in rect_class:
+                    x_list = np.append(rect[:, 0], rect[0, 0])
+                    y_list = np.append(rect[:, 1], rect[0, 1])
+                    axs[0].plot(x_list, y_list)
+
+            for dynasty in range(dynasties_values.shape[1]):
+                axs[1].plot(range(i), dynasties_values[:i, dynasty].flatten())
+
+            fig.savefig(f"Scrins/band{i}.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
 
         ################################################################################
         # write drowing values subplots
