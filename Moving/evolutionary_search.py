@@ -231,7 +231,8 @@ class EvolSearch:
 
         # save best gen
         best_index = np.argsort(self.fitness * (-1))[-1:]
-        self.dynasties_best_values.append(self.pop[best_index])
+        # self.dynasties_best_values.append(self.pop[best_index])
+        self.best_gen = self.pop[best_index]
 
         # work over each dynasty separately
         for pop, fitness, mask_broken in zip(self.dynasties_pop, self.dynasties_fitness, self.dynasty_mask_broken):
@@ -243,8 +244,7 @@ class EvolSearch:
             bufer_pop = pop[parents_indexes, :]
 
             #  saving best value
-            best_index = np.argsort(fitness * (-1))[-1:]
-            self.dynasties_best_values.append(fitness[best_index])
+            self.dynasties_best_values.append(np.min(fitness))
 
             _mask = mask_broken[parents_indexes]  # define mask for mutation for parents
 
@@ -317,7 +317,7 @@ class EvolSearch:
         '''
         returns 1D array of the genotype that has max fitness
         '''
-        return self.pop[np.argmin(self.fitness), :]
+        return self.best_gen
 
     def get_best_individual_fitness(self):
         '''

@@ -63,23 +63,23 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0
-        max_num_gens = 102
+        max_num_gens = 101
         desired_fitness = 0.05
         es.step_generation()
         print(es.get_best_individual_fitness())
         print(es.get_best_individual_fitness() > desired_fitness)  # and num_gen > max_num_gens)
         while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
             print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
-            es.step_generation()
             self.save_best_gen(es.get_best_individual(), "test_gens.txt")
             self.save_dynasties(es.get_dynasties_best_value(), 'test_values.txt')
+            es.step_generation()
             num_gen += 1
 
         # print results
         print('Max fitness of population = ', es.get_best_individual_fitness())
         print('Best individual in population = ', es.get_best_individual())
 
-        self.artist("test_gens.txt", 'test_values.txt')
+        self.artist("test_gens.txt", 'test_values.txt', es.get_best_individual())
 
     def get_minimal_dist_mat(self):
         minimal_distances = []
@@ -165,7 +165,7 @@ class Optimizer:
 
     def fitness_function(self, gen, koef):
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.4, 0.6])
+        test_attention = np.array([0.9, 0.1])
         D, mask = self.test_function(x_vector)
         # print(D)
         mask = []
@@ -346,11 +346,13 @@ class Optimizer:
 
         return mask_gen, amount_intersections
 
-    def artist(self, filename_gens, filename_values, gif_time=10, type_draw="all"):
+    def artist(self, filename_gens, filename_values, gen_example, gif_time=100, type_draw="all"):
         dynasties_values = []
         with open(filename_values, "r") as file:
             for line in file:
                 dynasties_values.append(line.split())
+
+        dynasties_values = dynasties_values[1:]
 
         dynasties_values = np.float_(dynasties_values)
 
@@ -359,19 +361,37 @@ class Optimizer:
             for line in file:
                 gens.append(line.split())
 
+        gens = gens[1:]
         gens = np.float_(gens)
+        gens = np.array(gens)
 
-        fig, axs = plt.subplots(2)
-        axs[0].axis('equal')
-        axs[1].set_xlim(0, gens.shape[0])
+
+
+
 
         for gen, values, i in zip(gens, dynasties_values, range(gens.shape[0])):
-            obj_classes = self.builder(gen, self.windows, self.main_points, 150)
-            for rect_class in obj_classes:
+
+            fig, axs = plt.subplots(2)
+            axs[0].axis('equal')
+            axs[1].set_xlim(0, gens.shape[0])
+            axs[1].set_ylim(0, 0.2)
+
+            transformed_gen = []
+            first_index = 0
+            for obj_class in gen_example[0]:
+                length = obj_class.shape[0]
+                transformed_gen.append(gen[first_index:first_index+length])
+                first_index += length
+
+            transformed_gen = np.array(transformed_gen, dtype="object")
+            obj_classes = self.builder(transformed_gen, self.windows, self.main_points, 150)
+            colors = ['red', 'blue', 'yellow', 'black', 'green']
+            colors = colors[:transformed_gen.shape[0]]
+            for rect_class, color in zip(obj_classes, colors):
                 for rect in rect_class:
                     x_list = np.append(rect[:, 0], rect[0, 0])
                     y_list = np.append(rect[:, 1], rect[0, 1])
-                    axs[0].plot(x_list, y_list)
+                    axs[0].plot(x_list, y_list, color=color)
 
             for dynasty in range(dynasties_values.shape[1]):
                 axs[1].plot(range(i), dynasties_values[:i, dynasty].flatten())
@@ -381,8 +401,8 @@ class Optimizer:
             plt.close(fig)
 
         if type_draw == 'all':
-            print('Udate Images')
-            names = [f"Scrins/band{band}.jpg" for band in range(0, gens.shape(0), 10)]
+            print('Udate Images', gens.shape[0])
+            names = [f"Scrins/band{band}.jpg" for band in range(0, gens.shape[0])]
             images = [Image.open(f) for f in names]
             images = [image.convert("P", palette=Image.ADAPTIVE) for image in images]
             fp_out = "image.gif"
@@ -397,24 +417,29 @@ class Optimizer:
         try:
             with open(filename, "a") as file_values:
                 file_values.write('\n')
-                for item in gen:
+                for item in values:
                     file_values.write("%s\t" % item)
 
         except:
             with open(filename, "w") as file_values:
-                file_values.write(values)
+                for item in values:
+                    file_values.write("%s\t" % item)
+
 
     def save_best_gen(self, gen, filename="Gens"):
         try:
             with open(filename, "a") as file_values:
                 file_values.write('\n')
-                for item in gen:
-                    file_values.write("%s\t" % item)
+                for obj_class in gen[0]:
+                    for item in obj_class:
+                        file_values.write("%s\t" % item)
 
         except:
             with open(filename, "w") as file_values:
-                for item in gen:
-                    file_values.write("%s\t" % item)
+                for obj_class in gen:
+                    for item in obj_class:
+                        file_values.write("%s\t" % item)
+
 
 
 if __name__ == "__main__":
