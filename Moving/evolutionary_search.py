@@ -319,6 +319,9 @@ class EvolSearch:
         '''
         return self.best_gen
 
+    def get_coefficients(self):
+        return self.coefficients
+
     def get_best_individual_fitness(self):
         '''
         return the fitness value of the best individual

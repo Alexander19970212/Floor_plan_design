@@ -63,7 +63,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0
-        max_num_gens = 101
+        max_num_gens = 30
         desired_fitness = 0.05
         es.step_generation()
         print(es.get_best_individual_fitness())
@@ -78,6 +78,7 @@ class Optimizer:
         # print results
         print('Max fitness of population = ', es.get_best_individual_fitness())
         print('Best individual in population = ', es.get_best_individual())
+        self.koef = es.get_coefficients()
 
         self.artist("test_gens.txt", 'test_values.txt', es.get_best_individual())
 
@@ -303,11 +304,13 @@ class Optimizer:
 
         return distances
 
-    def distant_between_classes(self, rects_classes, minimal_distances):
+    def distant_between_classes(self, rects_classes, minimal_distances, flag_debug=False):
         # print(minimal_distances)
         object_distant = 0
         number_classes = rects_classes.shape[0]
         broken_gens = []
+        if flag_debug:
+            print(minimal_distances)
         for i in range(number_classes):
             broken_gen = []
             for j in range(number_classes):
@@ -319,6 +322,9 @@ class Optimizer:
                     broken_gen.append(distances_mistake)
                     object_distant += np.sum(distances)
             broken_gens.append(broken_gen)
+
+        if flag_debug:
+            print('mistake_matrix', broken_gens)
 
         if number_classes >= 3:
             result_broken_gen = np.sum(broken_gens, axis=1)
@@ -365,10 +371,6 @@ class Optimizer:
         gens = np.float_(gens)
         gens = np.array(gens)
 
-
-
-
-
         for gen, values, i in zip(gens, dynasties_values, range(gens.shape[0])):
 
             fig, axs = plt.subplots(2)
@@ -380,11 +382,23 @@ class Optimizer:
             first_index = 0
             for obj_class in gen_example[0]:
                 length = obj_class.shape[0]
-                transformed_gen.append(gen[first_index:first_index+length])
+                transformed_gen.append(gen[first_index:first_index + length])
                 first_index += length
 
             transformed_gen = np.array(transformed_gen, dtype="object")
             obj_classes = self.builder(transformed_gen, self.windows, self.main_points, 150)
+
+            # delete later
+            mat_dist = self.get_minimal_dist_mat()
+            object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist,
+                                                                                               True)
+            # print('Distance', object_distant_value)
+            # mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
+            D = np.array([object_distant_value, dist_value])
+            test_attention = np.array([0.9, 0.1])
+            result = np.sum(test_attention * D / self.koef)
+            # print('Comparition', result, values)
+
             colors = ['red', 'blue', 'yellow', 'black', 'green']
             colors = colors[:transformed_gen.shape[0]]
             for rect_class, color in zip(obj_classes, colors):
@@ -425,7 +439,6 @@ class Optimizer:
                 for item in values:
                     file_values.write("%s\t" % item)
 
-
     def save_best_gen(self, gen, filename="Gens"):
         try:
             with open(filename, "a") as file_values:
@@ -441,17 +454,16 @@ class Optimizer:
                         file_values.write("%s\t" % item)
 
 
-
 if __name__ == "__main__":
     Classes = {
         'Workplace': {"Amount": 12, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
-                      "Classes_for_distant": {"Machine_tool": 40}},
+                      "Classes_for_distant": {"Machine_tool": 40, "Printers": 20}},
         'Printers': {"Amount": 3, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
                      "Need_lighting": 9,
                      "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
-                     "Classes_for_distant": {"Machine_tool": 50}},
+                     "Classes_for_distant": {"Machine_tool": 50, "Workplace": 20}},
         # 'Cabinets': {"Amount": 4, "rectangular_x": 0.5, "rectangular_y": 2, 'Environment_x': 1.5, "Environment_y": 1,
         #              "Need_lighting": 6,
         #              "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
