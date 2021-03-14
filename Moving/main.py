@@ -29,10 +29,11 @@ class Optimizer:
              [[100, 75], [165, 45]]])
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
 
-        # obj_classes = self.builder(gen, windows, main_points, 150)
+        # obj_classes = self.builder(gen, self.windows, self.main_points, 150)
         # mat_dist = self.get_minimal_dist_mat()
         # object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
         # self.constructor_broken_gen(result_broken_gen, gen)
+
         self.bounds = np.array(self.bounds, dtype="object")
         self.probability_mask = np.array(self.probability_mask, dtype="object")
         # print(self.probability_mask)
@@ -232,6 +233,35 @@ class Optimizer:
         offset = int(index * (n_drops - n))
         return drops[offset:offset + n, :]
 
+    def get_centre_points_option_2(self, drops, n, index):
+        binary_legth = '1'* n + '0'*(drops.shape[0]-n)
+        max_dec_number = int(binary_legth, 2)
+        dec_numbers = np.arange(int('1'*n, 2), max_dec_number, int((max_dec_number - int('1'*n, 2))/1000))
+        binary_list = ((dec_numbers[:, None] & (1 << np.arange(drops.shape[0]))) > 0).astype(int)
+        binary_list = binary_list[0, :]
+        binary_sum = np.sum(binary_list, axis=0)
+        all_options = binary_list[binary_sum==n]
+        option_index = int(index*drops.shape[0])
+        selected_option = all_options[option_index]
+        return drops[selected_option==1]
+
+    def get_centre_points_option_3(self, drops, n, index):
+        all_options = []
+        count = 0
+        i = 0
+        while count <= 1000:
+            if bin(i).count('1') == n:
+                option = [int(x) for x in list(format(i, '0'+str(drops.shape[0])+'b'))]
+                all_options.append(option)
+                count += 1
+            i += 1
+
+        all_options = np.array(all_options)
+        option_index = int(index * all_options.shape[0])
+        selected_option = all_options[option_index]
+        returned_drops = drops[selected_option == 1]
+        return returned_drops
+
     def locate_objects(self, rects, centre_points):
         centre_points = centre_points[:, np.newaxis, :]
         centre_points = np.repeat(centre_points, 4, axis=1)
@@ -272,7 +302,8 @@ class Optimizer:
                                                  int(n_y), p_x, off2_y, grid_angle)
             grid = self.cut_by_rectagular(previous_grid, window[0], window[1])
             centre_points = self.sorting_drops_bydistant(grid, main_point)
-            centre_points = self.get_centre_pints_opinion(centre_points, amount, layout_ind)
+            #  centre_points = self.get_centre_pints_opinion(centre_points, amount, layout_ind)
+            centre_points = self.get_centre_points_option_3(centre_points, amount, layout_ind)
             rectangulars = self.get_objects_angle(amount, p_x, p_y, objects_angles)
             rects = self.locate_objects(rectangulars, centre_points)
 
