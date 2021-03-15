@@ -15,6 +15,10 @@ from PIL import Image
 #  right gen code for minimal fitness function
 
 
+def closest(lst, K):
+    return lst[min(range(len(lst)), key=lambda i: abs(lst[i] - K))]
+
+
 class Optimizer:
     def __init__(self, classes):
         self.Classes = classes
@@ -261,6 +265,19 @@ class Optimizer:
         selected_option = all_options[option_index]
         returned_drops = drops[selected_option == 1]
         return returned_drops
+
+    def get_centre_points_option_4(self, drops, indexes):
+        indexes = indexes*drops.shape[0]
+        all_indexes = range(drops.shape[0])
+        selected_indexes = []
+        for index in indexes:
+            founded_index = closest(all_indexes, index)
+            selected_indexes.append(founded_index)
+            all_indexes.remove(founded_index)
+
+        return drops[selected_indexes]
+
+
 
     def locate_objects(self, rects, centre_points):
         centre_points = centre_points[:, np.newaxis, :]
