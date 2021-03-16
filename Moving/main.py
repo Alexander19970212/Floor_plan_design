@@ -15,77 +15,87 @@ from PIL import Image
 #  right gen code for minimal fitness function
 
 
-def closest(lst, K):
-    return lst[min(range(len(lst)), key=lambda i: abs(lst[i] - K))]
+def closest(lst, k):
+    """
+    Function searches the nearest values in list.
+    :param lst: list for searching
+    :param k: k object for search
+    :return: The nearest values from list to k.
+    """
+    return lst[min(range(len(lst)), key=lambda i: abs(lst[i] - k))]
 
 
 class Optimizer:
     def __init__(self, classes):
         self.Classes = classes
+
+        #  initialization parameters of genes: bounds (limits or list of variants, which variable can be),
+        #                                      probability_mask (density of probability in bounds)
         self.bounds = []
         self.probability_mask = []
         self.bounds_constructor()
         self.probability_mask_constructor()
-        gen = self.gen_constructor()
 
+        #  that parameters are used for definition case plan. Windows are ares for classes where it could be.
+        #  Main_points are points for each class. That points point are used for sorting cells of grid by distant.
+        #  In further these parameters should be obtain by other class.
         self.windows = np.array(
             [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
              [[100, 75], [165, 45]]])
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
 
+        #  That part of code is used for testing object function without GA.
+
+        # gen = self.gen_constructor()
         # obj_classes = self.builder(gen, self.windows, self.main_points, 150)
         # mat_dist = self.get_minimal_dist_mat()
         # object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
         # self.constructor_broken_gen(result_broken_gen, gen)
 
+        # gen = self.gen_constructor()
+        # coefficients = self.calibration_function(gen)
+        # new_gen = self.gen_constructor()
+        # result = self.fitness_function(new_gen, coefficients)
+
+        #  there is using that code row because classes don't have similar lengths.
         self.bounds = np.array(self.bounds, dtype="object")
         self.probability_mask = np.array(self.probability_mask, dtype="object")
-        # print(self.probability_mask)
-        # gen = self.gen_constructor()
-        # koef = self.calibration_function(gen)
-        # new_gen = self.gen_constructor()
-        # result = self.fitness_function(new_gen, koef)
 
         evol_params = {
-            'num_processes': 4,  # (optional) number of proccesses for multiprocessing.Pool
+            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
             'pop_size': 200,  # population size
             'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
             'calibration_function': self.calibration_function,
             'elitist_fraction': 2,  # fraction of population retained as is between generations
-            'bounds': self.bounds,
-            'probability_mask': self.probability_mask,
-            'num_branches': 3
+            'bounds': self.bounds,  # limits or list of variants, which variable can be
+            'probability_mask': self.probability_mask,  # density of probability in bounds
+            'num_branches': 3  # Amount of dynasties
         }
 
-        es = EvolSearch(evol_params)
+        es = EvolSearch(evol_params)  # Creating class for evolution search
 
-        '''OPTION 1
-        # execute the search for 100 generations
-        num_gens = 100
-        es.execute_search(num_gens)
-        '''
-
-        '''OPTION 2'''
         # keep searching till a stopping condition is reached
-        num_gen = 0
-        max_num_gens = 30
-        desired_fitness = 0.05
-        es.step_generation()
-        print(es.get_best_individual_fitness())
-        print(es.get_best_individual_fitness() > desired_fitness)  # and num_gen > max_num_gens)
+        num_gen = 0  # counter of pops
+        max_num_gens = 30  # Maximal amount of pops
+        desired_fitness = 0.05  # sufficient value of object function for finishing
+
+        es.step_generation()  # Creating the first population
+
+        #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
         while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
             print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
-            self.save_best_gen(es.get_best_individual(), "test_gens.txt")
-            self.save_dynasties(es.get_dynasties_best_value(), 'test_values.txt')
-            es.step_generation()
+            self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
+            self.save_dynasties(es.get_dynasties_best_value(),
+                                'test_values.txt')  # saving the best fitness values for each dynasties
+            es.step_generation()  # Creating new population
             num_gen += 1
 
         # print results
         print('Max fitness of population = ', es.get_best_individual_fitness())
         print('Best individual in population = ', es.get_best_individual())
-        self.koef = es.get_coefficients()
+        self.coefficients = es.get_coefficients()  # Getting found coefficients for recount getting plot result
 
-        self.artist("test_gens.txt", 'test_values.txt', es.get_best_individual())
+        self.artist("test_gens.txt", 'test_values.txt', es.get_best_individual())  # Plot rendering and saving as GIF
 
     def get_minimal_dist_mat(self):
         minimal_distances = []
@@ -238,16 +248,16 @@ class Optimizer:
         return drops[offset:offset + n, :]
 
     def get_centre_points_option_2(self, drops, n, index):
-        binary_legth = '1'* n + '0'*(drops.shape[0]-n)
+        binary_legth = '1' * n + '0' * (drops.shape[0] - n)
         max_dec_number = int(binary_legth, 2)
-        dec_numbers = np.arange(int('1'*n, 2), max_dec_number, int((max_dec_number - int('1'*n, 2))/1000))
+        dec_numbers = np.arange(int('1' * n, 2), max_dec_number, int((max_dec_number - int('1' * n, 2)) / 1000))
         binary_list = ((dec_numbers[:, None] & (1 << np.arange(drops.shape[0]))) > 0).astype(int)
         binary_list = binary_list[0, :]
         binary_sum = np.sum(binary_list, axis=0)
-        all_options = binary_list[binary_sum==n]
-        option_index = int(index*drops.shape[0])
+        all_options = binary_list[binary_sum == n]
+        option_index = int(index * drops.shape[0])
         selected_option = all_options[option_index]
-        return drops[selected_option==1]
+        return drops[selected_option == 1]
 
     def get_centre_points_option_3(self, drops, n, index):
         all_options = []
@@ -255,7 +265,7 @@ class Optimizer:
         i = 0
         while count <= 1000:
             if bin(i).count('1') == n:
-                option = [int(x) for x in list(format(i, '0'+str(drops.shape[0])+'b'))]
+                option = [int(x) for x in list(format(i, '0' + str(drops.shape[0]) + 'b'))]
                 all_options.append(option)
                 count += 1
             i += 1
@@ -267,7 +277,7 @@ class Optimizer:
         return returned_drops
 
     def get_centre_points_option_4(self, drops, indexes):
-        indexes = indexes*drops.shape[0]
+        indexes = indexes * drops.shape[0]
         all_indexes = range(drops.shape[0])
         selected_indexes = []
         for index in indexes:
@@ -276,8 +286,6 @@ class Optimizer:
             all_indexes.remove(founded_index)
 
         return drops[selected_indexes]
-
-
 
     def locate_objects(self, rects, centre_points):
         centre_points = centre_points[:, np.newaxis, :]
