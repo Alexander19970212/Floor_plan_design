@@ -58,7 +58,6 @@ class Optimizer:
         # result = self.fitness_function(new_gen, coefficients)
 
         #  there is using that code row because classes don't have similar lengths.
-        self.bounds = np.array(self.bounds, dtype="object")
         self.probability_mask = np.array(self.probability_mask, dtype="object")
 
         evol_params = {
@@ -98,23 +97,41 @@ class Optimizer:
         self.artist("test_gens.txt", 'test_values.txt', es.get_best_individual())  # Plot rendering and saving as GIF
 
     def get_minimal_dist_mat(self):
-        minimal_distances = []
+        """
+        The function creates 2-d matrix with distant between classes. That is based on parameters
+        in classes' description.
+        :return: 2-d numpy array with distances.
+        """
+        minimal_distances = []  # 2d matrix
         for class_1 in self.Classes:
-            min_dist_one_axies = []
+            min_dist_one_axes = []  # row of 2d matrix
             for class_2 in self.Classes:
-                if class_1 != class_2:
-                    try:
+                if class_1 != class_2:  # only for different classes
+                    try:  # in the case if minimal distant is described
                         dist = self.Classes[class_1]["Classes_for_distant"][class_2]
                     except:
-                        dist = 0
+                        dist = 0  # 0 means distant between classes is not considered
                 else:
                     dist = 0
-                min_dist_one_axies.append(dist)
-            minimal_distances.append(min_dist_one_axies)
+                min_dist_one_axes.append(dist)
+            minimal_distances.append(min_dist_one_axes)
 
         return np.array(minimal_distances)
 
     def bounds_constructor(self):
+        """
+        Function creates limits or list of variants which could be as variable in genes.
+        Description:
+        1: x grid step (1-2 environment rectangular x)
+        2: y grid step (1-2 environment rectangular y)
+        3-4: offset (x, y) grid form main point (0-1 environment rectangular)
+        5-6: Small group shape (x, y) of grid
+        7-8: x, y distances between small group (1.5 - 3 environment rectangular)
+        9: Rotation of grid (list of degrees)
+        10: index of distribution (0-1)
+        11-last: rotation angle for each component
+        :return: None
+        """
         for kind in self.Classes:
             layer_parameters = [[self.Classes[kind]['Environment_x'], self.Classes[kind]['Environment_x'] * 2],
                                 [self.Classes[kind]['Environment_y'], self.Classes[kind]['Environment_y'] * 2],
@@ -124,21 +141,33 @@ class Optimizer:
                                 [self.Classes[kind]['Environment_y'] * 1.5, self.Classes[kind]['Environment_y'] * 3],
                                 [0, 45, 90], [0, 1]]
             for drop in range(0, self.Classes[kind]["Amount"]):
-                layer_parameters.append([0, 45, 90])
+                layer_parameters.append([0, 45, 90])  # same variants list for each component
             self.bounds.append(layer_parameters)
 
+        #  there is using that code row because classes don't have similar lengths.
+        self.bounds = np.array(self.bounds, dtype="object")
+
     def probability_mask_constructor(self):
+        """
+        The function describes density of probability in bounds.
+        int or float - offset in triangular density of probability
+        'Equally_distributed' - equally density in whole bounds
+        list - probability for each element in bounds list (sum should be 1)
+        :return:
+        """
         for kind in self.Classes:
-            layer_parameters = [0, 0,  # P_x, P_y
+            layer_parameters = [0, 0,  # x, y grid steps
                                 0, 0,  # Offset_x, Offset_y from main point
-                                0.5, 0.5,  # N_x, N_y
-                                'Equally_distributed', 'Equally_distributed',  # offsets from points group
-                                # 'Equally_distributed', 'Equally_distributed',
-                                [0.4, 0.2, 0.4],  # grid angle
-                                0]  #
+                                0.5, 0.5,  # Shape (x, y) of small group
+                                'Equally_distributed', 'Equally_distributed',  # distances (x, y) between small groups
+                                [0.4, 0.2, 0.4],  # grid rotation angle
+                                0]  # Index distribution
             for drop in range(0, self.Classes[kind]["Amount"]):
-                layer_parameters.append([0.4, 0.2, 0.4])
+                layer_parameters.append([0.4, 0.2, 0.4])  # rotation for each component
             self.probability_mask.append(layer_parameters)
+
+        #  there is using that code row because classes don't have similar lengths.
+        self.probability_mask = np.array(self.probability_mask, dtype="object")
 
     def gen_constructor(self):
         big_gen = []
