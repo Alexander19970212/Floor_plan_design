@@ -43,6 +43,7 @@ class Optimizer:
             [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
              [[100, 75], [165, 45]]])
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
+        self.max_diagonal = 150
 
         #  That part of code is used for testing object function without GA.
 
@@ -170,54 +171,84 @@ class Optimizer:
         self.probability_mask = np.array(self.probability_mask, dtype="object")
 
     def gen_constructor(self):
+        """
+        The function creates gen based on list probability and bounds.
+        :return: One gen as numpy array
+        """
         big_gen = []
-        for net_mask, net_doubt in zip(self.probability_mask, self.bounds):
+        for net_mask, net_doubt in zip(self.probability_mask, self.bounds):  # cycle for each grid
             net_gen = []
             for probability, value_slot in zip(net_mask, net_doubt):
 
+                # for (x, y) grid steps, (x, y) offset from main point, shape of small group, index distribution
                 if type(probability) is int:
                     net_gen.append(random.triangular(value_slot[0], value_slot[1],
                                                      value_slot[0] + (value_slot[1] - value_slot[0]) * probability))
                 elif type(probability) is float:
                     net_gen.append(random.triangular(value_slot[0], value_slot[1],
                                                      value_slot[0] + (value_slot[1] - value_slot[0]) * probability))
+                #  if probability distribution is equally
                 elif type(probability) is str:
                     net_gen.append(random.uniform(value_slot[0], value_slot[1]))
+
+                #  if probability is defended by list
                 else:
-                    # print(value_slot, probability)
                     net_gen.append(random.choices(value_slot, cum_weights=probability, k=1)[0])
 
-                # elif type(probability) == 'str':
-                # else:
             big_gen.append(net_gen)
-        # print(big_gen)
+
+        # returning gen as numpy array
         return np.array(big_gen, dtype='object')
 
     def test_function(self, gen):
-        obj_classes = self.builder(gen, self.windows, self.main_points, 150)
-        mat_dist = self.get_minimal_dist_mat()
+        """
+        The function gets gen, builds individual, analyzes it and creates mask list with broken parts.
+        :param gen: Numpy array - list of variables.
+        :return: list of penalty values and broken mask
+        """
+        # building floor plan which based on gen.
+        obj_classes = self.builder(gen, self.windows, self.main_points, self.max_diagonal)  # list rectangles
+        mat_dist = self.get_minimal_dist_mat()  # getting matrix of minimal distant between classes
+
+        # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
+        # sum amount if its
         object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist)
-        # print('Distance', object_distant_value)
+        # getting full broken mask
         mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
 
         return np.array([object_distant_value, dist_value]), mask
 
     def calibration_function(self, x_vector):
+        """
+        The function is used for automated scaling (selecting penalty weights). That returns only penalty values
+        :param x_vector: numpy array - gen
+        :return: numpy array - list of penalty values
+        """
         x_vector = np.array(x_vector, dtype="object")
-        # print(x_vector)
         penalties, mask = self.test_function(x_vector)
         return penalties
 
-    def fitness_function(self, gen, koef):
+    def fitness_function(self, gen, weights):
+        """
+        The function calculates fitness function as sum of penalty values multiplied by penalty weights.
+        :param gen: numpy array - list variables
+        :param weights: list of penalty weights, which was gotten in automated scaling.
+        :return: float (0-1) - fitness values, numpy array - broken mask
+        """
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.9, 0.1])
-        D, mask = self.test_function(x_vector)
-        # print(D)
+        test_attention = np.array([0.9, 0.1])  # influence penalty values to result
+
+        try:
+            penalties, mask = self.test_function(x_vector)  # getting list penalty values and broken mask
+            result = np.sum(test_attention * penalties / weights)
+        except:  # if floor plan could be built by gen
+            result = 1
+
+        # This cod rows turn off directed evolution. That creates broken mask with only ones.
         mask = []
         for grid in gen:
             mask.append(np.ones_like(np.array(grid)))
 
-        result = np.sum(test_attention * D / koef)
         return [result, np.array(mask, dtype='object')]
 
     def get_cells_grids(self, main_point, offset_grid, max_rad, n_x, p_x, dist_x, n_y, p_y, dist_y, deg):
@@ -228,16 +259,13 @@ class Optimizer:
         xy_copy = np.copy(xy)
         xy_copy[:, 0] *= -1
         xy = np.append(xy, xy_copy, axis=0)
-        # print(xy)
         bases_grid = np.unique(xy, axis=0)
         bases_grid_copy = bases_grid.copy()
         for r_x in range(n_x):
             for r_y in range(n_y):
                 xy_ = bases_grid_copy + [r_x * p_x, r_y * p_y]
                 bases_grid = np.append(bases_grid, xy_, axis=0)
-        # print(bases_grid.shape)
         if deg != 0:
-            # print("Deg", deg)
             bases_grid = self.ratation(bases_grid, deg)
         bases_grid = bases_grid + main_point
         bases_grid = bases_grid + offset_grid
