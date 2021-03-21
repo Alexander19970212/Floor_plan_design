@@ -52,7 +52,7 @@ class Optimizer:
         # mat_dist = self.get_minimal_dist_mat()
         # object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
         # self.constructor_broken_gen(result_broken_gen, gen)
-
+        #
         # gen = self.gen_constructor()
         # coefficients = self.calibration_function(gen)
         # new_gen = self.gen_constructor()
@@ -140,7 +140,9 @@ class Optimizer:
                                 [1, 10], [1, 10],
                                 [self.Classes[kind]['Environment_x'] * 1.5, self.Classes[kind]['Environment_x'] * 3],
                                 [self.Classes[kind]['Environment_y'] * 1.5, self.Classes[kind]['Environment_y'] * 3],
-                                [0, 45, 90], [0, 1]]
+                                [0, 45, 90]]
+            for drop in range(0, self.Classes[kind]["Amount"]):  # locations of each component on grid
+                layer_parameters.append([0, 1])
             for drop in range(0, self.Classes[kind]["Amount"]):
                 layer_parameters.append([0, 45, 90])  # same variants list for each component
             self.bounds.append(layer_parameters)
@@ -161,8 +163,9 @@ class Optimizer:
                                 0, 0,  # Offset_x, Offset_y from main point
                                 0.5, 0.5,  # Shape (x, y) of small group
                                 'Equally_distributed', 'Equally_distributed',  # distances (x, y) between small groups
-                                [0.4, 0.2, 0.4],  # grid rotation angle
-                                0]  # Index distribution
+                                [0.4, 0.2, 0.4]]  # grid rotation angle
+            for drop in range(0, self.Classes[kind]["Amount"]):
+                layer_parameters.append('Equally_distributed')  # location for each component
             for drop in range(0, self.Classes[kind]["Amount"]):
                 layer_parameters.append([0.4, 0.2, 0.4])  # rotation for each component
             self.probability_mask.append(layer_parameters)
@@ -334,11 +337,11 @@ class Optimizer:
         return returned_drops
 
     def get_centre_points_option_4(self, drops, indexes):
-        indexes = indexes * drops.shape[0]
-        all_indexes = range(drops.shape[0])
+        # indexes = indexes * drops.shape[0]
+        all_indexes = list(range(drops.shape[0]))
         selected_indexes = []
         for index in indexes:
-            founded_index = closest(all_indexes, index)
+            founded_index = closest(all_indexes, index * drops.shape[0])
             selected_indexes.append(founded_index)
             all_indexes.remove(founded_index)
 
@@ -370,22 +373,22 @@ class Optimizer:
 
         object_class = []
         for chromosome, window, main_point, color in zip(gen, windows, main_points, colors):
-            grid = chromosome[0]
             p_x, p_y = chromosome[0], chromosome[1]
             offset_x, offset_y = chromosome[2], chromosome[3]
             n_x, n_y = chromosome[4], chromosome[5]
             off2_x, off2_y = chromosome[6], chromosome[7]
-            layout_ind = chromosome[9]
             grid_angle = chromosome[8]
             # print("Grid_angle", grid_angle)
-            objects_angles = chromosome[10:]
+            locations_angles_amount = len(chromosome[9:])
+            locations_indexes = chromosome[9:int(9+locations_angles_amount/2)]
+            objects_angles = chromosome[int(9+locations_angles_amount/2):]
             amount = len(objects_angles)
             previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], dioganal, int(n_x), p_x, off2_x,
                                                  int(n_y), p_x, off2_y, grid_angle)
             grid = self.cut_by_rectagular(previous_grid, window[0], window[1])
             centre_points = self.sorting_drops_bydistant(grid, main_point)
             #  centre_points = self.get_centre_pints_opinion(centre_points, amount, layout_ind)
-            centre_points = self.get_centre_points_option_3(centre_points, amount, layout_ind)
+            centre_points = self.get_centre_points_option_4(centre_points, locations_indexes)
             rectangulars = self.get_objects_angle(amount, p_x, p_y, objects_angles)
             rects = self.locate_objects(rectangulars, centre_points)
 
@@ -509,7 +512,7 @@ class Optimizer:
             # mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
             D = np.array([object_distant_value, dist_value])
             test_attention = np.array([0.9, 0.1])
-            result = np.sum(test_attention * D / self.koef)
+            result = np.sum(test_attention * D / self.coefficients)
             # print('Comparition', result, values)
 
             colors = ['red', 'blue', 'yellow', 'black', 'green']
