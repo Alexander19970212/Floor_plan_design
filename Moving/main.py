@@ -255,26 +255,57 @@ class Optimizer:
         return [result, np.array(mask, dtype='object')]
 
     def get_cells_grids(self, main_point, offset_grid, max_rad, n_x, p_x, dist_x, n_y, p_y, dist_y, deg):
+        """
+        The function builds grid and returns cells which are separated to smalls groups.
+        :param main_point: list x, y coords - point for base cell of grid
+        :param offset_grid: list x, y distant - offset of base cell from main point
+        :param max_rad: int (float) distant - cells exist only inside circle with that radius
+        :param n_x: int - cells' amount in x row in small group
+        :param p_x: float - x grid step in small groups
+        :param dist_x: float - x distant between small group
+        :param n_y: int - cells' amount in y row in small group
+        :param p_y: float - y grid step in small group
+        :param dist_y: y distant between small groups
+        :param deg: rotation of whole grid (degree)
+        :return: numpy array with coords of cells
+        """
+        # Get cells in the first quarter
         xy = np.mgrid[0:max_rad:n_x * p_x + dist_x, 0:max_rad:n_y * p_y + dist_y].reshape(2, -1).T
+
+        #  Copy to the fourth quarter
         xy_copy = np.copy(xy)
         xy_copy[:, 1] *= -1
         xy = np.append(xy, xy_copy, axis=0)
+
+        #  Copy to the second and third quarters
         xy_copy = np.copy(xy)
         xy_copy[:, 0] *= -1
         xy = np.append(xy, xy_copy, axis=0)
+
+        # remove repetitive values
         bases_grid = np.unique(xy, axis=0)
         bases_grid_copy = bases_grid.copy()
+
+        # copy as smalls group
         for r_x in range(n_x):
             for r_y in range(n_y):
                 xy_ = bases_grid_copy + [r_x * p_x, r_y * p_y]
                 bases_grid = np.append(bases_grid, xy_, axis=0)
+
+        # rotation
         if deg != 0:
             bases_grid = self.ratation(bases_grid, deg)
+
+        # move to main point and shift by offset
         bases_grid = bases_grid + main_point
         bases_grid = bases_grid + offset_grid
+
+        # For debugging: show grid
+
         # print(bases_grid.shape)
         # plt.plot(bases_grid[:, 0], bases_grid[:, 1], 'o')
         # plt.show()
+
         return bases_grid
 
     def cut_by_rectagular(self, grid, up_left_cords, down_right_cords):
