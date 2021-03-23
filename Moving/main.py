@@ -309,6 +309,13 @@ class Optimizer:
         return bases_grid
 
     def cut_by_rectagular(self, grid, up_left_cords, down_right_cords):
+        """
+        The function returns only points within window.
+        :param grid: list - coords (x, y) of all grid cells
+        :param up_left_cords: list (shape = (2, 1)) coords (x, y) of left up corner
+        :param down_right_cords: list (shape = (2, 1)) coords (x, y) of raght down
+        :return: list - coords (x, y) of cells inside window
+        """
         grid = grid[grid[:, 0] > up_left_cords[0]]
         grid = grid[grid[:, 0] < down_right_cords[0]]
         grid = grid[grid[:, 1] < up_left_cords[1]]
@@ -317,6 +324,14 @@ class Optimizer:
         return grid
 
     def get_objects_angle(self, amount, p_x, p_y, rotation_list):
+        """
+        The function creates rectangles (list coords) and rotates it by angles list.
+        :param amount: int - amount of rectangles
+        :param p_x: float - x size of rectangle
+        :param p_y: float - y size of rectangle
+        :param rotation_list: list - angles of rotation of each rectangle
+        :return: numpy array - list of rectangles coords
+        """
         rects = np.array([[[-p_x, p_y], [p_x, p_y], [p_x, -p_y], [-p_x, -p_y]]]) / 2
         rects = np.repeat(rects, amount, axis=0)
         rotated_rects = []
@@ -329,13 +344,31 @@ class Optimizer:
         return np.array(rotated_rects)
 
     def sorting_drops_bydistant(self, drops, main_point):
-        drops = np.unique(drops, axis=0)
+        """
+        The function sorts cells of grid by distant from main point.
+        :param drops: numpy array - coords list of cells
+        :param main_point: list - (x, y) coords of point.
+        :return: numpy array sorted by distant from main point
+        """
+        drops = np.unique(drops, axis=0)  # remove repetitive cells
+
+        # get distant list
         distant = ((drops[:, 0] - main_point[0]) ** 2 + (drops[:, 1] - main_point[1]) ** 2) ** 0.5
         return drops[np.argsort(distant)]
 
     def get_centre_pints_opinion(self, drops, n, index):
+        """
+        The function return n points from list drops. This points are got by offset which are depended by index (0, 1).
+        0 means zero offset from first index. 1 means offset from last index.
+        :param drops: numpy array - coords' list of permitted cells
+        :param n:  int - amount of cells which have to be returned
+        :param index: float (0-1) - index of option
+        :return: numpy array - coords list of n points
+        """
+        # scaling and getting offset
         n_drops = drops.shape[0]
         offset = int(index * (n_drops - n))
+
         return drops[offset:offset + n, :]
 
     def get_centre_points_option_2(self, drops, n, index):
