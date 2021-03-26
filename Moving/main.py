@@ -372,18 +372,45 @@ class Optimizer:
         return drops[offset:offset + n, :]
 
     def get_centre_points_option_2(self, drops, n, index):
-        binary_legth = '1' * n + '0' * (drops.shape[0] - n)
-        max_dec_number = int(binary_legth, 2)
+        """
+        The function searches all opinions of distribution, normalizes theirs' amount and returns one of them by index.
+        The function isn't used due to so much amount of opinions.
+        :param drops: numpy array - coords' list if permitted cells
+        :param n: int - amount of cells which have to be returned
+        :param index: float (0-1) - index of opinion
+        :return: numpy array - coords list of n points
+        """
+        binary_length = '1' * n + '0' * (drops.shape[0] - n)  # get max limit opinion
+        max_dec_number = int(binary_length, 2)  # transforming binary max limit to dec int
+
+        # get all options like arrange to max index
         dec_numbers = np.arange(int('1' * n, 2), max_dec_number, int((max_dec_number - int('1' * n, 2)) / 1000))
+
+        # transforming all options like binary code list
         binary_list = ((dec_numbers[:, None] & (1 << np.arange(drops.shape[0]))) > 0).astype(int)
         binary_list = binary_list[0, :]
+
+        # get options where amount of ones equals n
         binary_sum = np.sum(binary_list, axis=0)
         all_options = binary_list[binary_sum == n]
+
+        # normalizing index and getting the nearest option to it
         option_index = int(index * drops.shape[0])
         selected_option = all_options[option_index]
         return drops[selected_option == 1]
 
     def get_centre_points_option_3(self, drops, n, index):
+        """
+        The function search 1000 usable options of distribution and returns one of them by index.
+        The function isn't used due to good options is missed.
+        :param drops: numpy array - coords' list of permitted cells
+        :param n: int - amount of cells which have to be returned
+        :param index: float (0-1) - index of option
+        :return: numpy array - coords list of n points
+        """
+
+        # In the cycle counter is transformed into binary. If sum of ones in it is n, that binary code will be saved as
+        # option. Cycle continues while amount of options less then threshold.
         all_options = []
         count = 0
         i = 0
@@ -395,13 +422,22 @@ class Optimizer:
             i += 1
 
         all_options = np.array(all_options)
+
+        # normalizing index and getting the nearest option
         option_index = int(index * all_options.shape[0])
         selected_option = all_options[option_index]
         returned_drops = drops[selected_option == 1]
         return returned_drops
 
     def get_centre_points_option_4(self, drops, indexes):
-        # indexes = indexes * drops.shape[0]
+        """
+        The function transformers list of indexes (0-1) to list of points' coords (first cell - last cell)
+        :param drops: numpy array - coords' list of permitted cells
+        :param indexes: list of floats (0-1) - normalized indexes of locations
+        :return: numpy array - coords list of n points
+        """
+        # Create range list indexes of each drops. Scale float indexes to int (0 - index of last cell) list.
+        # For each index in cycle found the closest, remove it from previous so that couldn't be repeated.
         all_indexes = list(range(drops.shape[0]))
         selected_indexes = []
         for index in indexes:
