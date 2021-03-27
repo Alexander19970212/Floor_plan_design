@@ -35,13 +35,18 @@ class Optimizer:
         self.probability_mask = []
         self.bounds_constructor()
         self.probability_mask_constructor()
+        gen = self.gen_constructor()
 
         #  that parameters are used for definition case plan. Windows are ares for classes where it could be.
         #  Main_points are points for each class. That points point are used for sorting cells of grid by distant.
         #  In further these parameters should be obtain by other class.
-        self.windows = np.array(
-            [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
-             [[100, 75], [165, 45]]])
+        # self.windows = np.array(
+        #     [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
+        #      [[100, 75], [165, 45]]])
+
+        self.windows = np.array([[(7, 15), (7, 22), (20, 22), (20, 15)], [(4, 8), (4, 18), (12, 18), (12, 8)],
+                                 [(7, 4), (7, 11), (20, 11), (20, 4)]]) * 10
+
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
         self.max_diagonal = 150
 
@@ -74,9 +79,16 @@ class Optimizer:
 
         es = EvolSearch(evol_params)  # Creating class for evolution search
 
+        '''OPTION 1
+        # execute the search for 100 generations
+        num_gens = 100
+        es.execute_search(num_gens)
+        '''
+
+        '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 30  # Maximal amount of pops
+        max_num_gens = 1000  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -316,6 +328,25 @@ class Optimizer:
 
         return grid
 
+    def cut_by_some_rectangles(self, grid, rectangles):
+        result = np.array([])
+        for rectangle in rectangles:
+            up_coords = max(rectangle[:, 1])
+            down_coords = min(rectangle[:, 1])
+            left_coords = min(rectangle[:, 0])
+            right_coords = max(rectangle[:, 0])
+
+            if result.size == 0:
+                result = np.array(self.cut_by_rectagular(grid, [left_coords, up_coords], [right_coords, down_coords]))
+
+            else:
+                result = np.append(result, self.cut_by_rectagular(grid, [left_coords, up_coords], [right_coords, down_coords]),
+                          axis=0)
+
+        result = np.array(result)
+
+        return np.unique(result, axis=0)
+
     def get_objects_angle(self, amount, p_x, p_y, rotation_list):
         rects = np.array([[[-p_x, p_y], [p_x, p_y], [p_x, -p_y], [-p_x, -p_y]]]) / 2
         rects = np.repeat(rects, amount, axis=0)
@@ -403,7 +434,7 @@ class Optimizer:
         colors = colors[:gen.shape[0]]
 
         object_class = []
-        for chromosome, window, main_point, color in zip(gen, windows, main_points, colors):
+        for chromosome, main_point, color in zip(gen, main_points, colors):
             p_x, p_y = chromosome[0], chromosome[1]
             offset_x, offset_y = chromosome[2], chromosome[3]
             n_x, n_y = chromosome[4], chromosome[5]
@@ -411,12 +442,13 @@ class Optimizer:
             grid_angle = chromosome[8]
             # print("Grid_angle", grid_angle)
             locations_angles_amount = len(chromosome[9:])
-            locations_indexes = chromosome[9:int(9+locations_angles_amount/2)]
-            objects_angles = chromosome[int(9+locations_angles_amount/2):]
+            locations_indexes = chromosome[9:int(9 + locations_angles_amount / 2)]
+            objects_angles = chromosome[int(9 + locations_angles_amount / 2):]
             amount = len(objects_angles)
             previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], dioganal, int(n_x), p_x, off2_x,
                                                  int(n_y), p_x, off2_y, grid_angle)
-            grid = self.cut_by_rectagular(previous_grid, window[0], window[1])
+            #  grid = self.cut_by_rectagular(previous_grid, window[0], window[1])
+            grid = self.cut_by_some_rectangles(previous_grid, windows)
             centre_points = self.sorting_drops_bydistant(grid, main_point)
             #  centre_points = self.get_centre_pints_opinion(centre_points, amount, layout_ind)
             centre_points = self.get_centre_points_option_4(centre_points, locations_indexes)
@@ -500,6 +532,19 @@ class Optimizer:
         return mask_gen, amount_intersections
 
     def artist(self, filename_gens, filename_values, gen_example, gif_time=100, type_draw="all"):
+        from shapely.ops import unary_union
+        from shapely.geometry import Polygon, mapping
+
+        polygons = []
+
+        for rectangle in self.windows:
+            polygons.append(Polygon(rectangle))
+
+        polygons = unary_union(polygons)
+
+        countur_coords = np.array(mapping(polygons)['coordinates'][0])
+
+
         dynasties_values = []
         with open(filename_values, "r") as file:
             for line in file:
@@ -523,7 +568,11 @@ class Optimizer:
             fig, axs = plt.subplots(2)
             axs[0].axis('equal')
             axs[1].set_xlim(0, gens.shape[0])
-            axs[1].set_ylim(0, 0.2)
+            axs[1].set_ylim(0, 0.4)
+
+            x_list = np.append(countur_coords[:, 0], countur_coords[0, 0])
+            y_list = np.append(countur_coords[:, 1], countur_coords[0, 1])
+            axs[0].plot(x_list, y_list, color="black")
 
             transformed_gen = []
             first_index = 0
@@ -537,8 +586,7 @@ class Optimizer:
 
             # delete later
             mat_dist = self.get_minimal_dist_mat()
-            object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist,
-                                                                                               True)
+            object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist)
             # print('Distance', object_distant_value)
             # mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
             D = np.array([object_distant_value, dist_value])
@@ -563,7 +611,7 @@ class Optimizer:
 
         if type_draw == 'all':
             print('Udate Images', gens.shape[0])
-            names = [f"Scrins/band{band}.jpg" for band in range(0, gens.shape[0])]
+            names = [f"Scrins/band{band}.jpg" for band in range(0, gens.shape[0], 5)]
             images = [Image.open(f) for f in names]
             images = [image.convert("P", palette=Image.ADAPTIVE) for image in images]
             fp_out = "image.gif"
@@ -603,14 +651,14 @@ class Optimizer:
 
 if __name__ == "__main__":
     Classes = {
-        'Workplace': {"Amount": 12, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
+        'Workplace': {"Amount": 60, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                       "Classes_for_distant": {"Machine_tool": 40, "Printers": 20}},
-        'Printers': {"Amount": 3, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
+        'Printers': {"Amount": 7, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
                      "Need_lighting": 9,
                      "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
-                     "Classes_for_distant": {"Machine_tool": 50, "Workplace": 20}},
+                     "Classes_for_distant": {"Machine_tool": 50, "Workplace": 2}},
         # 'Cabinets': {"Amount": 4, "rectangular_x": 0.5, "rectangular_y": 2, 'Environment_x': 1.5, "Environment_y": 1,
         #              "Need_lighting": 6,
         #              "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
@@ -620,7 +668,7 @@ if __name__ == "__main__":
         #          "Classes_for_short_path": [None],
         #          "Classes_ignored_intersections": ["Workplace", "Printers", "Cabinets", "Machine_tool"],
         #          "Classes_for_distant": {None}},
-        'Machine_tool': {"Amount": 4, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
+        'Machine_tool': {"Amount": 10, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
                          "Need_lighting": 8,
                          "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                          "Classes_for_distant": {"Workplace": 40, "Printers": 50, "Cabinets": 5}}
