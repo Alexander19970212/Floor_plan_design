@@ -321,6 +321,13 @@ class Optimizer:
         return bases_grid
 
     def cut_by_rectagular(self, grid, up_left_cords, down_right_cords):
+        """
+        The function returns only points within window.
+        :param grid: list - coords (x, y) of all grid cells
+        :param up_left_cords: list (shape = (2, 1)) coords (x, y) of left up corner
+        :param down_right_cords: list (shape = (2, 1)) coords (x, y) of raght down
+        :return: list - coords (x, y) of cells inside window
+        """
         grid = grid[grid[:, 0] > up_left_cords[0]]
         grid = grid[grid[:, 0] < down_right_cords[0]]
         grid = grid[grid[:, 1] < up_left_cords[1]]
@@ -348,6 +355,14 @@ class Optimizer:
         return np.unique(result, axis=0)
 
     def get_objects_angle(self, amount, p_x, p_y, rotation_list):
+        """
+        The function creates rectangles (list coords) and rotates it by angles list.
+        :param amount: int - amount of rectangles
+        :param p_x: float - x size of rectangle
+        :param p_y: float - y size of rectangle
+        :param rotation_list: list - angles of rotation of each rectangle
+        :return: numpy array - list of rectangles coords
+        """
         rects = np.array([[[-p_x, p_y], [p_x, p_y], [p_x, -p_y], [-p_x, -p_y]]]) / 2
         rects = np.repeat(rects, amount, axis=0)
         rotated_rects = []
@@ -360,28 +375,73 @@ class Optimizer:
         return np.array(rotated_rects)
 
     def sorting_drops_bydistant(self, drops, main_point):
-        drops = np.unique(drops, axis=0)
+        """
+        The function sorts cells of grid by distant from main point.
+        :param drops: numpy array - coords list of cells
+        :param main_point: list - (x, y) coords of point.
+        :return: numpy array sorted by distant from main point
+        """
+        drops = np.unique(drops, axis=0)  # remove repetitive cells
+
+        # get distant list
         distant = ((drops[:, 0] - main_point[0]) ** 2 + (drops[:, 1] - main_point[1]) ** 2) ** 0.5
         return drops[np.argsort(distant)]
 
     def get_centre_pints_opinion(self, drops, n, index):
+        """
+        The function return n points from list drops. This points are got by offset which are depended by index (0, 1).
+        0 means zero offset from first index. 1 means offset from last index.
+        :param drops: numpy array - coords' list of permitted cells
+        :param n:  int - amount of cells which have to be returned
+        :param index: float (0-1) - index of option
+        :return: numpy array - coords list of n points
+        """
+        # scaling and getting offset
         n_drops = drops.shape[0]
         offset = int(index * (n_drops - n))
+
         return drops[offset:offset + n, :]
 
     def get_centre_points_option_2(self, drops, n, index):
-        binary_legth = '1' * n + '0' * (drops.shape[0] - n)
-        max_dec_number = int(binary_legth, 2)
+        """
+        The function searches all opinions of distribution, normalizes theirs' amount and returns one of them by index.
+        The function isn't used due to so much amount of opinions.
+        :param drops: numpy array - coords' list if permitted cells
+        :param n: int - amount of cells which have to be returned
+        :param index: float (0-1) - index of opinion
+        :return: numpy array - coords list of n points
+        """
+        binary_length = '1' * n + '0' * (drops.shape[0] - n)  # get max limit opinion
+        max_dec_number = int(binary_length, 2)  # transforming binary max limit to dec int
+
+        # get all options like arrange to max index
         dec_numbers = np.arange(int('1' * n, 2), max_dec_number, int((max_dec_number - int('1' * n, 2)) / 1000))
+
+        # transforming all options like binary code list
         binary_list = ((dec_numbers[:, None] & (1 << np.arange(drops.shape[0]))) > 0).astype(int)
         binary_list = binary_list[0, :]
+
+        # get options where amount of ones equals n
         binary_sum = np.sum(binary_list, axis=0)
         all_options = binary_list[binary_sum == n]
+
+        # normalizing index and getting the nearest option to it
         option_index = int(index * drops.shape[0])
         selected_option = all_options[option_index]
         return drops[selected_option == 1]
 
     def get_centre_points_option_3(self, drops, n, index):
+        """
+        The function search 1000 usable options of distribution and returns one of them by index.
+        The function isn't used due to good options is missed.
+        :param drops: numpy array - coords' list of permitted cells
+        :param n: int - amount of cells which have to be returned
+        :param index: float (0-1) - index of option
+        :return: numpy array - coords list of n points
+        """
+
+        # In the cycle counter is transformed into binary. If sum of ones in it is n, that binary code will be saved as
+        # option. Cycle continues while amount of options less then threshold.
         all_options = []
         count = 0
         i = 0
@@ -393,13 +453,22 @@ class Optimizer:
             i += 1
 
         all_options = np.array(all_options)
+
+        # normalizing index and getting the nearest option
         option_index = int(index * all_options.shape[0])
         selected_option = all_options[option_index]
         returned_drops = drops[selected_option == 1]
         return returned_drops
 
     def get_centre_points_option_4(self, drops, indexes):
-        # indexes = indexes * drops.shape[0]
+        """
+        The function transformers list of indexes (0-1) to list of points' coords (first cell - last cell)
+        :param drops: numpy array - coords' list of permitted cells
+        :param indexes: list of floats (0-1) - normalized indexes of locations
+        :return: numpy array - coords list of n points
+        """
+        # Create range list indexes of each drops. Scale float indexes to int (0 - index of last cell) list.
+        # For each index in cycle found the closest, remove it from previous so that couldn't be repeated.
         all_indexes = list(range(drops.shape[0]))
         selected_indexes = []
         for index in indexes:
