@@ -141,8 +141,8 @@ class Optimizer:
         5-6: Small group shape (x, y) of grid
         7-8: x, y distances between small group (1.5 - 3 environment rectangular)
         9: Rotation of grid (list of degrees)
-        10: index of distribution (0-1)
-        11-last: rotation angle for each component
+        11 - ... : normalized locations' indexes' list
+        ... - last: rotation angle for each component
         :return: None
         """
         for kind in self.Classes:
@@ -306,7 +306,7 @@ class Optimizer:
 
         # rotation
         if deg != 0:
-            bases_grid = self.ratation(bases_grid, deg)
+            bases_grid = self.rotation(bases_grid, deg)
 
         # move to main point and shift by offset
         bases_grid = bases_grid + main_point
@@ -336,23 +336,36 @@ class Optimizer:
         return grid
 
     def cut_by_some_rectangles(self, grid, rectangles):
+        """
+        The function returns points, which only in rectangles.
+        :param grid: numpy array - coords(x, y) of all points
+        :param rectangles: list - coords of rectangles' corners.
+        :return: numpy array - coords (x, y) of points in rectangles.
+        """
         result = np.array([])
+
+        # check each rectangle if points are in it.
         for rectangle in rectangles:
+
+            # get corners' coords (for the case if corners were not rowed).
             up_coords = max(rectangle[:, 1])
             down_coords = min(rectangle[:, 1])
             left_coords = min(rectangle[:, 0])
             right_coords = max(rectangle[:, 0])
 
+            #  for the first points or if result list is empty.
             if result.size == 0:
                 result = np.array(self.cut_by_rectagular(grid, [left_coords, up_coords], [right_coords, down_coords]))
 
+            #  detected points are added into result list.
             else:
-                result = np.append(result, self.cut_by_rectagular(grid, [left_coords, up_coords], [right_coords, down_coords]),
-                          axis=0)
+                result = np.append(result,
+                                   self.cut_by_rectagular(grid, [left_coords, up_coords], [right_coords, down_coords]),
+                                   axis=0)
 
         result = np.array(result)
 
-        return np.unique(result, axis=0)
+        return np.unique(result, axis=0)  # remove repetitive points
 
     def get_objects_angle(self, amount, p_x, p_y, rotation_list):
         """
@@ -368,7 +381,7 @@ class Optimizer:
         rotated_rects = []
         for rect, angle in zip(rects, rotation_list):
             if angle == 0:
-                rotated_rects.append(self.ratation(rect, angle))
+                rotated_rects.append(self.rotation(rect, angle))
             else:
                 rotated_rects.append(rect)
 
@@ -479,11 +492,25 @@ class Optimizer:
         return drops[selected_indexes]
 
     def locate_objects(self, rects, centre_points):
+        """
+        The function moves rectangles to grid cells using centre of rectangles.
+        :param rects: numpy array - coords rectangles' list all centres of which in (0, 0)
+        :param centre_points: numpy array - grid coords' list.
+        :return: numpy array - coords' list offset rectangles.
+        """
+        # centre points are transformed to size like rects by adding new axis and repeating for four corners.
         centre_points = centre_points[:, np.newaxis, :]
         centre_points = np.repeat(centre_points, 4, axis=1)
         return rects + centre_points
 
-    def ratation(self, drops, deg):
+    def rotation(self, drops, deg):
+        """
+        The function rotates points in 2-d space relatively (0, 0).
+        :param drops: numpy array - coords' list of points for rotation.
+        :param deg: int or float - angle for rotation in degree.
+        :return: numpy array - coords' list of rotated points.
+        """
+        # Get rotation matrix.
         theta = np.radians(deg)
         c, s = np.cos(theta), np.sin(theta)
         R = np.array([[c, -s], [s, c]])
@@ -499,30 +526,58 @@ class Optimizer:
         return B
 
     def builder(self, gen, windows, main_points, dioganal):
-        colors = ['red', 'blue', 'yellow', 'black', 'green']
+        """
+        The function build floor plan according gen.
+        :param gen: numpy array - x vector. It includes description for each class.
+                    Description:
+                    1: x grid step (1-2 environment rectangular x)
+                    2: y grid step (1-2 environment rectangular y)
+                    3-4: offset (x, y) grid form main point (0-1 environment rectangular)
+                    5-6: Small group shape (x, y) of grid
+                    7-8: x, y distances between small group (1.5 - 3 environment rectangular)
+                    9: Rotation of grid (list of degrees)
+                    11 - ... : normalized locations' indexes' list
+                    ... - last: rotation angle for each component
+
+        :param windows: numpy array - list of rectangles which constitute counter.
+        :param main_points: numpy array - list points for sorting grids' points
+        :param dioganal: int (float) - max dimension of counter
+        :return: numpy array - coords of rectangles in floor plan
+        """
+        colors = ['red', 'blue', 'yellow', 'black', 'green']  # for showing result that step of necessity.
         colors = colors[:gen.shape[0]]
 
         object_class = []
+        #  classes of objects are built separately
         for chromosome, main_point, color in zip(gen, main_points, colors):
+            # gen parsing
             p_x, p_y = chromosome[0], chromosome[1]
             offset_x, offset_y = chromosome[2], chromosome[3]
             n_x, n_y = chromosome[4], chromosome[5]
             off2_x, off2_y = chromosome[6], chromosome[7]
             grid_angle = chromosome[8]
-            # print("Grid_angle", grid_angle)
             locations_angles_amount = len(chromosome[9:])
             locations_indexes = chromosome[9:int(9 + locations_angles_amount / 2)]
             objects_angles = chromosome[int(9 + locations_angles_amount / 2):]
             amount = len(objects_angles)
+
+            # Get grid that is covering all space.
             previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], dioganal, int(n_x), p_x, off2_x,
                                                  int(n_y), p_x, off2_y, grid_angle)
-            #  grid = self.cut_by_rectagular(previous_grid, window[0], window[1])
+
+            # Remove points which are outside counter.
             grid = self.cut_by_some_rectangles(previous_grid, windows)
-            centre_points = self.sorting_drops_bydistant(grid, main_point)
-            #  centre_points = self.get_centre_pints_opinion(centre_points, amount, layout_ind)
+
+            centre_points = self.sorting_drops_bydistant(grid, main_point)  # Sorting by distant from main point
+
+            #  get cells for location according locations' indexes
             centre_points = self.get_centre_points_option_4(centre_points, locations_indexes)
-            rectangulars = self.get_objects_angle(amount, p_x, p_y, objects_angles)
-            rects = self.locate_objects(rectangulars, centre_points)
+
+            # Get rotated rectangles according angles' list
+            rectangles = self.get_objects_angle(amount, p_x, p_y, objects_angles)
+
+            # Move rectangles to grids' points.
+            rects = self.locate_objects(rectangles, centre_points)
 
             # plt.axis('equal')
             # plt.plot(grid[:, 0], grid[:, 1], 'o')
@@ -612,7 +667,6 @@ class Optimizer:
         polygons = unary_union(polygons)
 
         countur_coords = np.array(mapping(polygons)['coordinates'][0])
-
 
         dynasties_values = []
         with open(filename_values, "r") as file:
