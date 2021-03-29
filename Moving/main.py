@@ -592,14 +592,23 @@ class Optimizer:
         return np.array(object_class, dtype='object')
 
     def distant_between_two_classes(self, rects_1, rects_2):
+        """
+        The function calculates distances between rectangles' corners from different objects' classes.
+        :param rects_1: numpy array - coords list of rectangles in class 1
+        :param rects_2: numpy array - coords list of rectangles in class 2
+        :return:  numpy array - distances' list
+        """
+
+        # Transform classes matrix to one size.
+        # Each matrix expansions in axis 0 by repeating times like number of objects in other class.
         amount_rects_1 = rects_1.shape[0]
         amount_rects_2 = rects_2.shape[0]
         rects_1_matrix = rects_1[np.newaxis, :, :, :]
         rects_2_matrix = rects_2[np.newaxis, :, :, :]
-
         rects_1_matrix = np.repeat(rects_1_matrix, amount_rects_2, axis=0)
         rects_2_matrix = np.repeat(rects_2_matrix, amount_rects_1, axis=0)
 
+        # Find distances like in Pythagoras theorem
         x_distances = rects_1_matrix[:, :, :, 0] - rects_2_matrix[:, :, :, 0].transpose((1, 0, 2))
         y_distances = rects_1_matrix[:, :, :, 1] - rects_2_matrix[:, :, :, 1].transpose((1, 0, 2))
 
@@ -608,20 +617,37 @@ class Optimizer:
         return distances
 
     def distant_between_classes(self, rects_classes, minimal_distances, flag_debug=False):
-        # print(minimal_distances)
-        object_distant = 0
+        """
+        The function finds distances between classes, detects disturbances,
+        sums that and builds part of mask where disturbances were detected.
+        :param rects_classes: numpy array - classes of objects in built floor plan.
+        :param minimal_distances: numpy array - square matrix. Minimal distances between i and j classes
+                                    is at the intersection i raw and j column.
+        :param flag_debug: bool - for debugging. True - "prints" will be showed.
+        :return: Number of disturbances, mask where disturbances are at, numpy array - matrix with disturbances.
+        """
+        object_distant = 0  # for disturbances sum
         number_classes = rects_classes.shape[0]
         broken_gens = []
         if flag_debug:
             print(minimal_distances)
+
+        # check distances inside all couple of classes
         for i in range(number_classes):
             broken_gen = []
             for j in range(number_classes):
                 if i != j:
+                    # get matrix with distances
                     distances = self.distant_between_two_classes(rects_classes[i], rects_classes[j])
+
+                    # find position where distances are exceeded
                     distances_mistake = (distances < minimal_distances[i, j]) * 1
+
+                    # Sum disturbances
                     distances_mistake = np.sum(distances_mistake, axis=2)
                     distances_mistake = np.sum(distances_mistake, axis=0)
+
+                    # Save for couple
                     broken_gen.append(distances_mistake)
                     object_distant += np.sum(distances)
             broken_gens.append(broken_gen)
@@ -629,15 +655,17 @@ class Optimizer:
         if flag_debug:
             print('mistake_matrix', broken_gens)
 
+        # Transform to one side broken gen mask
         if number_classes >= 3:
             result_broken_gen = np.sum(broken_gens, axis=1)
         else:
             result_broken_gen = broken_gens
 
-        object_distant_value = 0
-        for chromasome_index in range(number_classes):
-            object_distant_value += np.sum(result_broken_gen[chromasome_index])
-            result_broken_gen[chromasome_index] = (result_broken_gen[chromasome_index] >= 1) * 1
+        object_distant_value = 0  # additional sum of disturbances
+        for chromosome_index in range(number_classes):
+            object_distant_value += np.sum(result_broken_gen[chromosome_index])
+            # transform broken mask as part of chromosome
+            result_broken_gen[chromosome_index] = (result_broken_gen[chromosome_index] >= 1) * 1
 
         return object_distant_value, result_broken_gen, object_distant
 
