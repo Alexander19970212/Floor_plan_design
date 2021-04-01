@@ -669,6 +669,46 @@ class Optimizer:
 
         return object_distant_value, result_broken_gen, object_distant
 
+    def light_object_function(self, classes_centre_points, win_lines, light_coefficients):
+        """
+        The function calculates distances to window and sums it.
+        :param classes_centre_points: numpy array - list with rectangles centres' coords
+        :param win_lines: list - list with edges' coords of window
+        :param light_coefficients: numpy array - how is light needed for class (0-10)
+        :return: list - sum of light distant for each class, numpy array - piece of broken gen
+        """
+        light_distance = []
+        broken_gen = []
+        for class_recs in classes_centre_points:
+            class_value, class_piece_broken_gen = self.light_function_for_class(class_recs, win_lines)
+            light_distance.append(class_value)
+            broken_gen.append(class_piece_broken_gen)
+
+        broken_gen = self.get_brokengen_light(broken_gen)
+        light_distance_sum = np.sum(np.array(light_distance) * light_coefficients)
+
+        return light_distance_sum, broken_gen
+
+    def light_function_for_class(self, rects_centres, windows):
+        """
+        THe function calculates distances' sum for each rectangles in class to all windows.
+        :param rects_centres: numpy array - list with rectangles' centres' coords
+        :param windows: list - list with edges' coords of windows
+        :return: float - sum of distances (sum of minimal distances),
+                    list - '1' where distances more then 10 cent of max.
+        """
+        rects_centres = rects_centres[np.newaxis, :, :]
+        windows = windows[np.newaxis, :, :, :]
+        rects_centres = np.repeat(rects_centres, windows.shape[1], axis=0)
+        windows = np.repeat(windows, rects_centres.shape[1], axis=0).T  # DEB check tranpose for many axis
+
+        d_1_sqr = (rects_centres[:, :, 0] - windows[:, :, 0, 0])**2 + (rects_centres[:, :, 1] - windows[:, :, 0, 1])**2
+        d_2_sqr = (rects_centres[:, :, 0] - windows[:, :, 1, 0])**2 + (rects_centres[:, :, 1] - windows[:, :, 0, 1])**2
+
+
+
+
+
     def constructor_broken_gen(self, parts_gen, example_gen):
         #  temprorary
         amount_intersections = 0
