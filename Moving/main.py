@@ -705,7 +705,35 @@ class Optimizer:
         d_1_sqr = (rects_centres[:, :, 0] - windows[:, :, 0, 0])**2 + (rects_centres[:, :, 1] - windows[:, :, 0, 1])**2
         d_2_sqr = (rects_centres[:, :, 0] - windows[:, :, 1, 0])**2 + (rects_centres[:, :, 1] - windows[:, :, 0, 1])**2
 
+        d_sqr = (windows[:, :, 0, 0] - windows[:, :, 1, 0])**2 + (windows[:, :, 0, 1] - windows[:, :, 1, 1])**2
 
+        d_1 = np.sqrt(d_1_sqr)
+        d_2 = np.sqrt(d_2_sqr)
+        d = np.sqrt(d_sqr)
+
+        p = (d_1 + d_2 + d) / 2
+
+        s = np.sqrt(p*(p-d_1)*(p-d_2)*(p-2))
+
+        h = (s/d)*2
+
+        mask_1 = (d_2_sqr < d_sqr + d_1_sqr)*1
+        mask_2 = (d_1_sqr < d_sqr + d_2_sqr)*1
+        mask = ((mask_1 + mask_2) > 0)*1
+        anti_mask = (mask - 1)*-1
+
+        d_corner = np.minimum(d_1, d_2)
+        min_dist = mask*h + anti_mask*d_corner
+
+        # min_dist = np.sum(min_dist, axis=2)  # FOR 1 OPTION
+        min_dist = np.amin(min_dist, axis=2)  # DEBBB
+
+        max_dist = np.amax(min_dist)
+
+        broken_gen = (min_dist > 0.9 * max_dist)
+        value = np.sum(min_dist)
+
+        return value, broken_gen
 
 
 
