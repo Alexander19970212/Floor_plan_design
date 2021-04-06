@@ -3,6 +3,8 @@ import random
 import matplotlib.pyplot as plt
 from evolutionary_search import EvolSearch
 from PIL import Image
+from shapely.ops import unary_union
+from shapely.geometry import Polygon, mapping
 
 
 #  debug distance between classes+
@@ -33,6 +35,8 @@ class Optimizer:
         #                                      probability_mask (density of probability in bounds)
         self.bounds = []
         self.probability_mask = []
+        self.windows_lines = np.array([])
+        self.light_coefficients = self.get_light_coefficients()
         self.bounds_constructor()
         self.probability_mask_constructor()
         gen = self.gen_constructor()
@@ -43,27 +47,30 @@ class Optimizer:
         # self.windows = np.array(
         #     [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
         #      [[100, 75], [165, 45]]])
-
+        lines_index = [0, 1, 2, 3, 4, 5, 6, 7, 8]
         self.windows = np.array([[(7, 15), (7, 22), (20, 22), (20, 15)], [(4, 8), (4, 18), (12, 18), (12, 8)],
                                  [(7, 4), (7, 11), (20, 11), (20, 4)]]) * 10
 
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
         self.max_diagonal = 150
+        self.windows_lines = self.get_win_lines(self.windows, lines_index)
 
         #  That part of code is used for testing object function without GA.
 
-        # gen = self.gen_constructor()
-        # obj_classes = self.builder(gen, self.windows, self.main_points, 150)
-        # mat_dist = self.get_minimal_dist_mat()
-        # object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
-        # self.constructor_broken_gen(result_broken_gen, gen)
-        #
+        gen = self.gen_constructor()
+        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points, 150)
+        mat_dist = self.get_minimal_dist_mat()
+        object_distant_value, result_broken_gen, obj_dist = self.distant_between_classes(obj_classes, mat_dist)
+        self.light_object_function(obj_centres, self.windows_lines, self.light_coefficients, gen)
+        self.constructor_broken_gen(result_broken_gen, gen)
+
         # gen = self.gen_constructor()
         # coefficients = self.calibration_function(gen)
         # new_gen = self.gen_constructor()
         # result = self.fitness_function(new_gen, coefficients)
 
         #  there is using that code row because classes don't have similar lengths.
+
         self.probability_mask = np.array(self.probability_mask, dtype="object")
 
         evol_params = {
@@ -74,7 +81,7 @@ class Optimizer:
             'elitist_fraction': 2,  # fraction of population retained as is between generations
             'bounds': self.bounds,  # limits or list of variants, which variable can be
             'probability_mask': self.probability_mask,  # density of probability in bounds
-            'num_branches': 3  # Amount of dynasties
+            'num_branches': 4  # Amount of dynasties
         }
 
         es = EvolSearch(evol_params)  # Creating class for evolution search
@@ -88,7 +95,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 1000  # Maximal amount of pops
+        max_num_gens = 30  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -108,6 +115,31 @@ class Optimizer:
         self.coefficients = es.get_coefficients()  # Getting found coefficients for recount getting plot result
 
         self.artist("test_gens.txt", 'test_values.txt', es.get_best_individual())  # Plot rendering and saving as GIF
+
+    def get_light_coefficients(self):
+        light_coeffs = []
+        for obj_class in self.Classes:
+            light_coeffs.append(self.Classes[obj_class]["Need_lighting"])
+
+        return light_coeffs
+
+    def get_win_lines(self, windows_rects, lines_index):
+        polygons = []
+
+        for rectangle in windows_rects:
+            polygons.append(Polygon(rectangle))
+
+        polygons = unary_union(polygons)
+
+        points = np.array(mapping(polygons)['coordinates'][0])
+        lines = []
+
+        for i in range(points.shape[0] - 1):
+            lines.append([points[i], points[i + 1]])
+
+        lines = np.array(lines)
+
+        return lines[lines_index]
 
     def get_minimal_dist_mat(self):
         """
@@ -222,16 +254,19 @@ class Optimizer:
         :return: list of penalty values and broken mask
         """
         # building floor plan which based on gen.
-        obj_classes = self.builder(gen, self.windows, self.main_points, self.max_diagonal)  # list rectangles
+        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points,
+                                                self.max_diagonal)  # list rectangles
         mat_dist = self.get_minimal_dist_mat()  # getting matrix of minimal distant between classes
 
         # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
         # sum amount if its
         object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist)
+        light_distance_sum, broken_gen_light = self.light_object_function(obj_centres, self.windows_lines,
+                                                                          self.light_coefficients, gen)
         # getting full broken mask
         mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
 
-        return np.array([object_distant_value, dist_value]), mask
+        return np.array([object_distant_value, dist_value, light_distance_sum]), broken_gen_light
 
     def calibration_function(self, x_vector):
         """
@@ -251,18 +286,21 @@ class Optimizer:
         :return: float (0-1) - fitness values, numpy array - broken mask
         """
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.9, 0.1])  # influence penalty values to result
+        test_attention = np.array([0.4, 0.1, 0.5])  # influence penalty values to result
 
         try:
             penalties, mask = self.test_function(x_vector)  # getting list penalty values and broken mask
             result = np.sum(test_attention * penalties / weights)
         except:  # if floor plan could be built by gen
             result = 1
+            mask = []
+            for grid in gen:
+                mask.append(np.ones_like(np.array(grid)))
 
         # This cod rows turn off directed evolution. That creates broken mask with only ones.
-        mask = []
-        for grid in gen:
-            mask.append(np.ones_like(np.array(grid)))
+        # mask = []
+        # for grid in gen:
+        #     mask.append(np.ones_like(np.array(grid)))
 
         return [result, np.array(mask, dtype='object')]
 
@@ -530,15 +568,14 @@ class Optimizer:
         The function build floor plan according gen.
         :param gen: numpy array - x vector. It includes description for each class.
                     Description:
-                    1: x grid step (1-2 environment rectangular x)
-                    2: y grid step (1-2 environment rectangular y)
-                    3-4: offset (x, y) grid form main point (0-1 environment rectangular)
-                    5-6: Small group shape (x, y) of grid
-                    7-8: x, y distances between small group (1.5 - 3 environment rectangular)
-                    9: Rotation of grid (list of degrees)
-                    11 - ... : normalized locations' indexes' list
+                    0: x grid step (1-2 environment rectangular x)
+                    1: y grid step (1-2 environment rectangular y)
+                    2-3: offset (x, y) grid form main point (0-1 environment rectangular)
+                    4-5: Small group shape (x, y) of grid
+                    6-7: x, y distances between small group (1.5 - 3 environment rectangular)
+                    8: Rotation of grid (list of degrees)
+                    9 - ... : normalized locations' indexes' list
                     ... - last: rotation angle for each component
-
         :param windows: numpy array - list of rectangles which constitute counter.
         :param main_points: numpy array - list points for sorting grids' points
         :param dioganal: int (float) - max dimension of counter
@@ -548,6 +585,7 @@ class Optimizer:
         colors = colors[:gen.shape[0]]
 
         object_class = []
+        object_centres = []
         #  classes of objects are built separately
         for chromosome, main_point, color in zip(gen, main_points, colors):
             # gen parsing
@@ -587,9 +625,10 @@ class Optimizer:
             #     plt.plot(x_list, y_list, color=color)
 
             object_class.append(rects)
+            object_centres.append(centre_points)
 
         #  plt.show()
-        return np.array(object_class, dtype='object')
+        return np.array(object_class, dtype='object'), np.array(object_centres, dtype='object')
 
     def distant_between_two_classes(self, rects_1, rects_2):
         """
@@ -669,12 +708,13 @@ class Optimizer:
 
         return object_distant_value, result_broken_gen, object_distant
 
-    def light_object_function(self, classes_centre_points, win_lines, light_coefficients):
+    def light_object_function(self, classes_centre_points, win_lines, light_coefficients, gen_ex):
         """
         The function calculates distances to window and sums it.
         :param classes_centre_points: numpy array - list with rectangles centres' coords
         :param win_lines: list - list with edges' coords of window
         :param light_coefficients: numpy array - how is light needed for class (0-10)
+        :param numpy array - gen for example for broken gen creating
         :return: list - sum of light distant for each class, numpy array - piece of broken gen
         """
         light_distance = []
@@ -684,10 +724,25 @@ class Optimizer:
             light_distance.append(class_value)
             broken_gen.append(class_piece_broken_gen)
 
-        broken_gen = self.get_brokengen_light(broken_gen)
+        broken_gen = self.get_brokengen_light(broken_gen, gen_ex)
         light_distance_sum = np.sum(np.array(light_distance) * light_coefficients)
 
         return light_distance_sum, broken_gen
+
+    def get_brokengen_light(self, parts_gen, example_gen):
+        """
+        The function includes parts gen where broken pieces are ones into zero array with size like gen.
+        :param parts_gen: list - broken pieces of gen
+        :param example_gen: numpy array - gen for example
+        :return: numpy array - gen where ones are broken parts
+        """
+        mask_gen = []
+        for chromosome, broken_part in zip(example_gen, parts_gen):
+            void_gen = np.zeros_like(chromosome)
+            void_gen[9:void_gen.shape[0] - broken_part.shape[0]] = broken_part
+            mask_gen.append(void_gen)
+
+        return np.array(mask_gen, dtype='object')
 
     def light_function_for_class(self, rects_centres, windows):
         """
@@ -700,12 +755,15 @@ class Optimizer:
         rects_centres = rects_centres[np.newaxis, :, :]
         windows = windows[np.newaxis, :, :, :]
         rects_centres = np.repeat(rects_centres, windows.shape[1], axis=0)
-        windows = np.repeat(windows, rects_centres.shape[1], axis=0).T  # DEB check tranpose for many axis
+        windows = np.transpose(np.repeat(windows, rects_centres.shape[1], axis=0),
+                               [1, 0, 2, 3])  # DEB check tranpose for many axis
 
-        d_1_sqr = (rects_centres[:, :, 0] - windows[:, :, 0, 0])**2 + (rects_centres[:, :, 1] - windows[:, :, 0, 1])**2
-        d_2_sqr = (rects_centres[:, :, 0] - windows[:, :, 1, 0])**2 + (rects_centres[:, :, 1] - windows[:, :, 0, 1])**2
+        d_1_sqr = (rects_centres[:, :, 0] - windows[:, :, 0, 0]) ** 2 + (
+                rects_centres[:, :, 1] - windows[:, :, 0, 1]) ** 2
+        d_2_sqr = (rects_centres[:, :, 0] - windows[:, :, 1, 0]) ** 2 + (
+                rects_centres[:, :, 1] - windows[:, :, 1, 1]) ** 2
 
-        d_sqr = (windows[:, :, 0, 0] - windows[:, :, 1, 0])**2 + (windows[:, :, 0, 1] - windows[:, :, 1, 1])**2
+        d_sqr = (windows[:, :, 0, 0] - windows[:, :, 1, 0]) ** 2 + (windows[:, :, 0, 1] - windows[:, :, 1, 1]) ** 2
 
         d_1 = np.sqrt(d_1_sqr)
         d_2 = np.sqrt(d_2_sqr)
@@ -713,20 +771,20 @@ class Optimizer:
 
         p = (d_1 + d_2 + d) / 2
 
-        s = np.sqrt(p*(p-d_1)*(p-d_2)*(p-2))
+        s = np.sqrt(p * (p - d_1) * (p - d_2) * (p - 2))
 
-        h = (s/d)*2
+        h = (s / d) * 2
 
-        mask_1 = (d_2_sqr < d_sqr + d_1_sqr)*1
-        mask_2 = (d_1_sqr < d_sqr + d_2_sqr)*1
-        mask = ((mask_1 + mask_2) > 0)*1
-        anti_mask = (mask - 1)*-1
+        mask_1 = (d_2_sqr < d_sqr + d_1_sqr) * 1
+        mask_2 = (d_1_sqr < d_sqr + d_2_sqr) * 1
+        mask = ((mask_1 + mask_2) > 1) * 1
+        anti_mask = (mask - 1) * -1
 
         d_corner = np.minimum(d_1, d_2)
-        min_dist = mask*h + anti_mask*d_corner
+        min_dist = mask * h + anti_mask * d_corner
 
         # min_dist = np.sum(min_dist, axis=2)  # FOR 1 OPTION
-        min_dist = np.amin(min_dist, axis=2)  # DEBBB
+        min_dist = np.amin(min_dist, axis=0)  # DEBBB
 
         max_dist = np.amax(min_dist)
 
@@ -735,18 +793,16 @@ class Optimizer:
 
         return value, broken_gen
 
-
-
     def constructor_broken_gen(self, parts_gen, example_gen):
         #  temprorary
         amount_intersections = 0
         mask_gen = []
         for chromosome, broken_part in zip(example_gen, parts_gen):
             void_gen = np.zeros_like(chromosome)
-            void_gen[void_gen.shape[0] - broken_part.shape[0]:] = broken_part
+            void_gen[9:void_gen.shape[0] - broken_part.shape[0]] = broken_part
+            void_gen[4] = 1
+            void_gen[5] = 1
             amount_intersections += np.sum(broken_part)
-            if np.sum(broken_part) >= 0.5 * broken_part.shape[0]:
-                void_gen[9] = 1
             mask_gen.append(void_gen)
 
         return mask_gen, amount_intersections
@@ -787,7 +843,7 @@ class Optimizer:
             fig, axs = plt.subplots(2)
             axs[0].axis('equal')
             axs[1].set_xlim(0, gens.shape[0])
-            axs[1].set_ylim(0, 0.4)
+            axs[1].set_ylim(0.2, 0.6)
 
             x_list = np.append(countur_coords[:, 0], countur_coords[0, 0])
             y_list = np.append(countur_coords[:, 1], countur_coords[0, 1])
@@ -801,16 +857,16 @@ class Optimizer:
                 first_index += length
 
             transformed_gen = np.array(transformed_gen, dtype="object")
-            obj_classes = self.builder(transformed_gen, self.windows, self.main_points, 150)
+            obj_classes, obj_centres = self.builder(transformed_gen, self.windows, self.main_points, 150)
 
             # delete later
             mat_dist = self.get_minimal_dist_mat()
             object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist)
             # print('Distance', object_distant_value)
             # mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
-            D = np.array([object_distant_value, dist_value])
-            test_attention = np.array([0.9, 0.1])
-            result = np.sum(test_attention * D / self.coefficients)
+            # D = np.array([object_distant_value, dist_value])
+            # test_attention = np.array([0.4, 0.1, 0.5])
+            # result = np.sum(test_attention * D / self.coefficients)
             # print('Comparition', result, values)
 
             colors = ['red', 'blue', 'yellow', 'black', 'green']
@@ -894,3 +950,4 @@ if __name__ == "__main__":
     }
 
     Opt = Optimizer(Classes)
+
