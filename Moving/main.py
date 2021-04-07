@@ -35,8 +35,6 @@ class Optimizer:
         #                                      probability_mask (density of probability in bounds)
         self.bounds = []
         self.probability_mask = []
-        self.windows_lines = np.array([])
-        self.light_coefficients = self.get_light_coefficients()
         self.bounds_constructor()
         self.probability_mask_constructor()
         gen = self.gen_constructor()
@@ -57,13 +55,12 @@ class Optimizer:
 
         #  That part of code is used for testing object function without GA.
 
-        gen = self.gen_constructor()
-        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points, 150)
-        mat_dist = self.get_minimal_dist_mat()
-        object_distant_value, result_broken_gen, obj_dist = self.distant_between_classes(obj_classes, mat_dist)
-        self.light_object_function(obj_centres, self.windows_lines, self.light_coefficients, gen)
-        self.constructor_broken_gen(result_broken_gen, gen)
-
+        # gen = self.gen_constructor()
+        # obj_classes = self.builder(gen, self.windows, self.main_points, 150)
+        # mat_dist = self.get_minimal_dist_mat()
+        # object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
+        # self.constructor_broken_gen(result_broken_gen, gen)
+        #
         # gen = self.gen_constructor()
         # coefficients = self.calibration_function(gen)
         # new_gen = self.gen_constructor()
@@ -74,14 +71,14 @@ class Optimizer:
         self.probability_mask = np.array(self.probability_mask, dtype="object")
 
         evol_params = {
-            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
-            'pop_size': 200,  # population size
+            'num_processes': 6,  # (optional) number of processes for multiprocessing.Pool
+            'pop_size': 600,  # population size
             'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
             'calibration_function': self.calibration_function,
             'elitist_fraction': 2,  # fraction of population retained as is between generations
             'bounds': self.bounds,  # limits or list of variants, which variable can be
             'probability_mask': self.probability_mask,  # density of probability in bounds
-            'num_branches': 4  # Amount of dynasties
+            'num_branches': 3  # Amount of dynasties
         }
 
         es = EvolSearch(evol_params)  # Creating class for evolution search
@@ -254,8 +251,7 @@ class Optimizer:
         :return: list of penalty values and broken mask
         """
         # building floor plan which based on gen.
-        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points,
-                                                self.max_diagonal)  # list rectangles
+        obj_classes = self.builder(gen, self.windows, self.main_points, self.max_diagonal)  # list rectangles
         mat_dist = self.get_minimal_dist_mat()  # getting matrix of minimal distant between classes
 
         # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
@@ -576,6 +572,7 @@ class Optimizer:
                     8: Rotation of grid (list of degrees)
                     9 - ... : normalized locations' indexes' list
                     ... - last: rotation angle for each component
+
         :param windows: numpy array - list of rectangles which constitute counter.
         :param main_points: numpy array - list points for sorting grids' points
         :param dioganal: int (float) - max dimension of counter
@@ -761,7 +758,7 @@ class Optimizer:
         d_1_sqr = (rects_centres[:, :, 0] - windows[:, :, 0, 0]) ** 2 + (
                 rects_centres[:, :, 1] - windows[:, :, 0, 1]) ** 2
         d_2_sqr = (rects_centres[:, :, 0] - windows[:, :, 1, 0]) ** 2 + (
-                rects_centres[:, :, 1] - windows[:, :, 1, 1]) ** 2
+                rects_centres[:, :, 1] - windows[:, :, 0, 1]) ** 2
 
         d_sqr = (windows[:, :, 0, 0] - windows[:, :, 1, 0]) ** 2 + (windows[:, :, 0, 1] - windows[:, :, 1, 1]) ** 2
 
@@ -950,4 +947,3 @@ if __name__ == "__main__":
     }
 
     Opt = Optimizer(Classes)
-
