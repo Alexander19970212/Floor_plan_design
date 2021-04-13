@@ -47,23 +47,23 @@ class Optimizer:
         # self.windows = np.array(
         #     [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
         #      [[100, 75], [165, 45]]])
-        lines_index = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        lines_index = [0, 1, 2, 3, 4]
         self.windows = np.array([[(7, 15), (7, 22), (20, 22), (20, 15)], [(4, 8), (4, 18), (12, 18), (12, 8)],
                                  [(7, 4), (7, 11), (20, 11), (20, 4)]]) * 10
 
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
-        self.max_diagonal = 150
+        self.max_diagonal = 180
         self.windows_lines = self.get_win_lines(self.windows, lines_index)
+        #self.windows_lines = np.array([[[200, 0], [0, 0]], [[0, 0], [0, 250]]])
 
         #  That part of code is used for testing object function without GA.
 
-        gen = self.gen_constructor()
-        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points, 150)
-        mat_dist = self.get_minimal_dist_mat()
-        object_distant_value, result_broken_gen, obj_dist = self.distant_between_classes(obj_classes, mat_dist)
-        self.light_object_function(obj_centres, self.windows_lines, self.light_coefficients, gen)
-        self.constructor_broken_gen(result_broken_gen, gen)
-
+        # gen = self.gen_constructor()
+        # obj_classes = self.builder(gen, self.windows, self.main_points, 150)
+        # mat_dist = self.get_minimal_dist_mat()
+        # object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
+        # self.constructor_broken_gen(result_broken_gen, gen)
+        #
         # gen = self.gen_constructor()
         # coefficients = self.calibration_function(gen)
         # new_gen = self.gen_constructor()
@@ -95,7 +95,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 30  # Maximal amount of pops
+        max_num_gens = 100  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -254,8 +254,7 @@ class Optimizer:
         :return: list of penalty values and broken mask
         """
         # building floor plan which based on gen.
-        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points,
-                                                self.max_diagonal)  # list rectangles
+        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points, self.max_diagonal)  # list rectangles
         mat_dist = self.get_minimal_dist_mat()  # getting matrix of minimal distant between classes
 
         # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
@@ -529,6 +528,33 @@ class Optimizer:
 
         return drops[selected_indexes]
 
+    def get_centre_points_by_groups(self, groups, indexes):
+        drops = np.append(groups[0], groups[0:])
+        all_indexes = list(range(drops.shape[0]))
+        selected_indexes = []
+        for index in indexes:
+            founded_index = closest(all_indexes, index * drops.shape[0])
+            selected_indexes.append(founded_index)
+            all_indexes.remove(founded_index)
+
+        ind = 0
+        arange_like_groups = []
+        for group in groups:
+            arange_like_groups.append(range(ind, ind+group.shape[0]))
+            ind += group.shape[0]
+
+        stat_by_group = []
+        for group in arange_like_groups:
+            number_intersections = len(list(set(group) & set(selected_indexes)))
+            number_voids = len(group) - len(number_intersections)
+            stat_by_group.append([number_intersections, number_voids])
+
+        stat_by_group = np.array(stat_by_group)
+        max_index = np.argmin(stat_by_group[:, 1])
+
+        ###################################################################################################
+
+
     def locate_objects(self, rects, centre_points):
         """
         The function moves rectangles to grid cells using centre of rectangles.
@@ -576,6 +602,7 @@ class Optimizer:
                     8: Rotation of grid (list of degrees)
                     9 - ... : normalized locations' indexes' list
                     ... - last: rotation angle for each component
+
         :param windows: numpy array - list of rectangles which constitute counter.
         :param main_points: numpy array - list points for sorting grids' points
         :param dioganal: int (float) - max dimension of counter
@@ -762,6 +789,9 @@ class Optimizer:
                 rects_centres[:, :, 1] - windows[:, :, 0, 1]) ** 2
         d_2_sqr = (rects_centres[:, :, 0] - windows[:, :, 1, 0]) ** 2 + (
                 rects_centres[:, :, 1] - windows[:, :, 1, 1]) ** 2
+
+        #dist_1 = np.absolute((rects_centres[:, :, 0] - windows[:, :, 0, 0]) ** 2 + (
+        #        rects_centres[:, :, 1] - windows[:, :, 0, 1]) ** 2)
 
         d_sqr = (windows[:, :, 0, 0] - windows[:, :, 1, 0]) ** 2 + (windows[:, :, 0, 1] - windows[:, :, 1, 1]) ** 2
 
@@ -950,4 +980,3 @@ if __name__ == "__main__":
     }
 
     Opt = Optimizer(Classes)
-
