@@ -529,9 +529,10 @@ class Optimizer:
         return drops[selected_indexes]
 
     def get_centre_points_by_groups(self, groups, indexes):
-        drops = np.append(groups[0], groups[0:])
+        drops = np.append(groups[0], groups[1:])
         all_indexes = list(range(drops.shape[0]))
         selected_indexes = []
+        result = []
         for index in indexes:
             founded_index = closest(all_indexes, index * drops.shape[0])
             selected_indexes.append(founded_index)
@@ -543,17 +544,34 @@ class Optimizer:
             arange_like_groups.append(range(ind, ind+group.shape[0]))
             ind += group.shape[0]
 
-        stat_by_group = []
-        for group in arange_like_groups:
-            number_intersections = len(list(set(group) & set(selected_indexes)))
-            number_voids = len(group) - len(number_intersections)
-            stat_by_group.append([number_intersections, number_voids])
+        while len(selected_indexes) > 0:
+            stat_by_group = []
+            for group in arange_like_groups:
+                number_intersections = len(list(set(group) & set(selected_indexes)))
+                number_voids = len(group) - len(number_intersections)
+                stat_by_group.append([number_intersections, number_voids])
 
-        stat_by_group = np.array(stat_by_group)
-        max_index = np.argmin(stat_by_group[:, 1])
+            stat_by_group = np.array(stat_by_group)
+            max_index = np.argmin(stat_by_group[:, 1])
 
-        ###################################################################################################
+            looked_group = arange_like_groups[max_index]
+            points_inside = list(set(looked_group) & set(selected_indexes))
+            #result_by_group = points_inside.copy()
+            result.extend(points_inside)
+            selected_indexes = selected_indexes.remove(points_inside)
+            looked_group = looked_group.remove(points_inside)
 
+            for point in looked_group:
+                if len(selected_indexes) == 0:
+                    break
+                nearest_point = closest(selected_indexes, point)
+                result.append(point)
+                selected_indexes.remove(nearest_point)
+
+
+            del arange_like_groups[max_index]
+
+        return  drops[result]
 
     def locate_objects(self, rects, centre_points):
         """
