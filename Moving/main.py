@@ -52,18 +52,19 @@ class Optimizer:
                                  [(7, 4), (7, 11), (20, 11), (20, 4)]]) * 10
 
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
-        self.max_diagonal = 180
+        self.max_diagonal = 200
         self.windows_lines = self.get_win_lines(self.windows, lines_index)
-        #self.windows_lines = np.array([[[200, 0], [0, 0]], [[0, 0], [0, 250]]])
-
+        #self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]], [[0, 300], [150, 300]]])
+        #self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]]])
         #  That part of code is used for testing object function without GA.
 
         # gen = self.gen_constructor()
-        # obj_classes = self.builder(gen, self.windows, self.main_points, 150)
+        # obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points, 150)
         # mat_dist = self.get_minimal_dist_mat()
-        # object_distant_value, result_broken_gen = self.distant_between_classes(obj_classes, mat_dist)
+        # object_distant_value, result_broken_gen, obj_dist = self.distant_between_classes(obj_classes, mat_dist)
+        # self.light_object_function(obj_centres, self.windows_lines, self.light_coefficients, gen)
         # self.constructor_broken_gen(result_broken_gen, gen)
-        #
+
         # gen = self.gen_constructor()
         # coefficients = self.calibration_function(gen)
         # new_gen = self.gen_constructor()
@@ -75,7 +76,7 @@ class Optimizer:
 
         evol_params = {
             'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
-            'pop_size': 200,  # population size
+            'pop_size': 500,  # population size
             'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
             'calibration_function': self.calibration_function,
             'elitist_fraction': 2,  # fraction of population retained as is between generations
@@ -95,7 +96,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 100  # Maximal amount of pops
+        max_num_gens = 30  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -254,7 +255,8 @@ class Optimizer:
         :return: list of penalty values and broken mask
         """
         # building floor plan which based on gen.
-        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points, self.max_diagonal)  # list rectangles
+        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points,
+                                                self.max_diagonal)  # list rectangles
         mat_dist = self.get_minimal_dist_mat()  # getting matrix of minimal distant between classes
 
         # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
@@ -285,7 +287,7 @@ class Optimizer:
         :return: float (0-1) - fitness values, numpy array - broken mask
         """
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.4, 0.1, 0.5])  # influence penalty values to result
+        test_attention = np.array([0.1, 0.8, 0.1])  # influence penalty values to result
 
         try:
             penalties, mask = self.test_function(x_vector)  # getting list penalty values and broken mask
@@ -297,9 +299,10 @@ class Optimizer:
                 mask.append(np.ones_like(np.array(grid)))
 
         # This cod rows turn off directed evolution. That creates broken mask with only ones.
-        # mask = []
-        # for grid in gen:
-        #     mask.append(np.ones_like(np.array(grid)))
+        if result >= 0.42:
+            mask = []
+            for grid in gen:
+                mask.append(np.ones_like(np.array(grid)))
 
         return [result, np.array(mask, dtype='object')]
 
@@ -528,51 +531,6 @@ class Optimizer:
 
         return drops[selected_indexes]
 
-    def get_centre_points_by_groups(self, groups, indexes):
-        drops = np.append(groups[0], groups[1:])
-        all_indexes = list(range(drops.shape[0]))
-        selected_indexes = []
-        result = []
-        for index in indexes:
-            founded_index = closest(all_indexes, index * drops.shape[0])
-            selected_indexes.append(founded_index)
-            all_indexes.remove(founded_index)
-
-        ind = 0
-        arange_like_groups = []
-        for group in groups:
-            arange_like_groups.append(range(ind, ind+group.shape[0]))
-            ind += group.shape[0]
-
-        while len(selected_indexes) > 0:
-            stat_by_group = []
-            for group in arange_like_groups:
-                number_intersections = len(list(set(group) & set(selected_indexes)))
-                number_voids = len(group) - len(number_intersections)
-                stat_by_group.append([number_intersections, number_voids])
-
-            stat_by_group = np.array(stat_by_group)
-            max_index = np.argmin(stat_by_group[:, 1])
-
-            looked_group = arange_like_groups[max_index]
-            points_inside = list(set(looked_group) & set(selected_indexes))
-            #result_by_group = points_inside.copy()
-            result.extend(points_inside)
-            selected_indexes = selected_indexes.remove(points_inside)
-            looked_group = looked_group.remove(points_inside)
-
-            for point in looked_group:
-                if len(selected_indexes) == 0:
-                    break
-                nearest_point = closest(selected_indexes, point)
-                result.append(point)
-                selected_indexes.remove(nearest_point)
-
-
-            del arange_like_groups[max_index]
-
-        return  drops[result]
-
     def locate_objects(self, rects, centre_points):
         """
         The function moves rectangles to grid cells using centre of rectangles.
@@ -620,7 +578,6 @@ class Optimizer:
                     8: Rotation of grid (list of degrees)
                     9 - ... : normalized locations' indexes' list
                     ... - last: rotation angle for each component
-
         :param windows: numpy array - list of rectangles which constitute counter.
         :param main_points: numpy array - list points for sorting grids' points
         :param dioganal: int (float) - max dimension of counter
@@ -808,9 +765,6 @@ class Optimizer:
         d_2_sqr = (rects_centres[:, :, 0] - windows[:, :, 1, 0]) ** 2 + (
                 rects_centres[:, :, 1] - windows[:, :, 1, 1]) ** 2
 
-        #dist_1 = np.absolute((rects_centres[:, :, 0] - windows[:, :, 0, 0]) ** 2 + (
-        #        rects_centres[:, :, 1] - windows[:, :, 0, 1]) ** 2)
-
         d_sqr = (windows[:, :, 0, 0] - windows[:, :, 1, 0]) ** 2 + (windows[:, :, 0, 1] - windows[:, :, 1, 1]) ** 2
 
         d_1 = np.sqrt(d_1_sqr)
@@ -819,16 +773,29 @@ class Optimizer:
 
         p = (d_1 + d_2 + d) / 2
 
-        s = np.sqrt(p * (p - d_1) * (p - d_2) * (p - 2))
+        s = np.sqrt(p * (p - d_1) * (p - d_2) * (p - d))
 
         h = (s / d) * 2
 
+        g_1_sqr = d_1_sqr - h**2
+        g_2_sqr = d_2_sqr - h**2
+
+        g_1 = np.sqrt(g_1_sqr)
+        g_2 = np.sqrt(g_2_sqr)
+
+        dist_to_point_1 = g_1 + h
+        dist_to_point_2 = g_2 + h
+
         mask_1 = (d_2_sqr < d_sqr + d_1_sqr) * 1
         mask_2 = (d_1_sqr < d_sqr + d_2_sqr) * 1
-        mask = ((mask_1 + mask_2) > 1) * 1
+        mask = ((mask_1 + mask_2) > 1) * 1    # mask  where have to be h
         anti_mask = (mask - 1) * -1
 
-        d_corner = np.minimum(d_1, d_2)
+        d_corner_mask = (d_1 < d_2) * 1
+        d_corner_anti_mask = (d_corner_mask - 1) * -1
+        d_corner = dist_to_point_1 * d_corner_mask + dist_to_point_2 * d_corner_anti_mask
+
+        #d_corner = np.minimum(d_1, d_2)
         min_dist = mask * h + anti_mask * d_corner
 
         # min_dist = np.sum(min_dist, axis=2)  # FOR 1 OPTION
@@ -836,7 +803,7 @@ class Optimizer:
 
         max_dist = np.amax(min_dist)
 
-        broken_gen = (min_dist > 0.9 * max_dist)
+        broken_gen = (min_dist > 0.4 * max_dist)
         value = np.sum(min_dist)
 
         return value, broken_gen
@@ -891,7 +858,7 @@ class Optimizer:
             fig, axs = plt.subplots(2)
             axs[0].axis('equal')
             axs[1].set_xlim(0, gens.shape[0])
-            axs[1].set_ylim(0.2, 0.6)
+            axs[1].set_ylim(0.1, 0.71)
 
             x_list = np.append(countur_coords[:, 0], countur_coords[0, 0])
             y_list = np.append(countur_coords[:, 1], countur_coords[0, 1])
@@ -992,9 +959,10 @@ if __name__ == "__main__":
         #          "Classes_ignored_intersections": ["Workplace", "Printers", "Cabinets", "Machine_tool"],
         #          "Classes_for_distant": {None}},
         'Machine_tool': {"Amount": 10, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
-                         "Need_lighting": 8,
+                         "Need_lighting": 1,
                          "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                          "Classes_for_distant": {"Workplace": 40, "Printers": 50, "Cabinets": 5}}
     }
 
     Opt = Optimizer(Classes)
+
