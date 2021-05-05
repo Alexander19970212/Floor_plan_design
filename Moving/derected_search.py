@@ -38,9 +38,11 @@ class DirSearch:
         self.probability_mask = evol_params['probability_mask']
         self.bounds = evol_params['bounds']
         self.num_ind = evol_params['number_individuals']
+        self.first_pop = evol_params['first_pop']
+        self.pop = self.first_pop.copy()
+        self.pop_old = self.first_pop.copy()
 
         # create other required data
-        self.coefficients = None
         self.num_processes = evol_params.get('num_processes', None)
         self.dynasties_best_values = []
         self.best_gen = None
@@ -49,6 +51,29 @@ class DirSearch:
         global __evolsearch_process_pool
         __evolsearch_process_pool = ProcessPool(self.num_processes)
         time.sleep(0.5)
+
+        global __evolsearch_process_pool
+
+        # estimate fitness using multiprocessing pool
+        if __evolsearch_process_pool:
+            # pool exists
+            self.fitness = np.asarray(
+                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
+        else:
+            # re-create pool
+            __evolsearch_process_pool = Pool(self.num_processes)
+            self.fitness = np.asarray(
+                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
+
+        # returned list contains mask of broken genes and fitness value, so that is separated
+        self.fitness_old = np.array(self.fitness, dtype="object")  # transforming to numpy array
+
+
+        self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
+        # save best gen
+        best_index = np.argsort(self.dynasties_best_values * (-1))[-1:]
+        # self.dynasties_best_values.append(self.pop[best_index])
+        self.best_gen = self.pop_old[best_index]
 
     def gen_genartion(self):
         """
@@ -77,20 +102,6 @@ class DirSearch:
 
         return big_gen
 
-    def colibarate_fitnes(self, individual_index):
-        """
-        Function returns list of penalty functions values for further auto scaling
-        :param individual_index: index of population that is calculated
-        :return: list of penalty functions values
-        """
-        if self.optional_args:  # for the case with kwargs
-            if len(self.optional_args) == 1:
-                return self.fitness_function(self.pop[individual_index, :], self.optional_args[0])
-            else:
-                return self.fitness_function(self.pop[individual_index, :], self.optional_args[individual_index])
-        else:
-            return self.calibration_function(self.pop[individual_index, :])
-
     def evaluate_fitness(self, individual_index):
         """
         Function returns value of object function
@@ -109,6 +120,9 @@ class DirSearch:
         """
         evaluate fitness of pop, and create new pop after crossing and mutation
         """
+        # create initial data of evolutionary search
+        self.pop = np.array([self.gen_genartion() for i in range(self.first_pop.shape[0])], dtype='object')
+
         global __evolsearch_process_pool
 
         # estimate fitness using multiprocessing pool
@@ -126,8 +140,10 @@ class DirSearch:
         self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
 
         # balancing !!!!!!!!!!!!!!!!!!!!!!!!!
+        best_pop = []
 
         for gen, gen_old, gen_fit, gen_fit_old in zip(self.pop, self.pop_old, self.fitness, self.fitness_old):
+            best_gen = []
             for chr, chr_old, chr_fit, chr_fit_old in zip(gen, gen_old, gen_fit, gen_fit_old):
                 locations_angles_amount = len(chr[9:])
 
@@ -141,15 +157,40 @@ class DirSearch:
                 anti_mask_superiority = (mask_superiority - 1) * (-1)
 
                 best_chr_ind = chr_ind * mask_superiority + chr_old_ind * anti_mask_superiority
+                best_chr_angl = chr_angl * mask_superiority + chr_old_angl * anti_mask_superiority
 
+                best_chr = chr.copy()
+                best_chr[9:int(9 + locations_angles_amount / 2)] = best_chr_ind
+                best_chr[int(9 + locations_angles_amount / 2):] = best_chr_angl
 
+                best_gen.append(best_chr)
 
+            best_pop.append(best_gen)
 
-    def get_fitnesses(self):
-        '''
-        simply return all fitness values of current population
-        '''
-        return self.fitness
+        self.pop = best_pop
+
+        global __evolsearch_process_pool
+
+        # estimate fitness using multiprocessing pool
+        if __evolsearch_process_pool:
+            # pool exists
+            self.fitness = np.asarray(
+                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
+        else:
+            # re-create pool
+            __evolsearch_process_pool = Pool(self.num_processes)
+            self.fitness = np.asarray(
+                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
+
+        # returned list contains mask of broken genes and fitness value, so that is separated
+        self.fitness_old = np.array(self.fitness, dtype="object")  # transforming to numpy array
+        self.pop_old = self.pop
+
+        self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
+        # save best gen
+        best_index = np.argsort(self.dynasties_best_values * (-1))[-1:]
+        # self.dynasties_best_values.append(self.pop[best_index])
+        self.best_gen = self.pop_old[best_index]
 
     def get_dynasties_best_value(self):
         return self.dynasties_best_values
@@ -160,26 +201,17 @@ class DirSearch:
         '''
         return self.best_gen
 
-    def get_coefficients(self):
-        return self.coefficients
-
     def get_best_individual_fitness(self):
         '''
         return the fitness value of the best individual
         '''
-        return np.min(self.fitness)
+        return np.min(self.dynasties_best_values)
 
     def get_mean_fitness(self):
         '''
         returns the mean fitness of the population
         '''
-        return np.mean(self.fitness)
-
-    def get_fitness_variance(self):
-        '''
-        returns variance of the population's fitness
-        '''
-        return np.std(self.fitness) ** 2
+        return np.mean(self.dynasties_best_values)
 
 
 if __name__ == "__main__":
