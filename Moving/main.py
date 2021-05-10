@@ -2,6 +2,7 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 from evolutionary_search import EvolSearch
+from derected_search import DirSearch
 from PIL import Image
 from shapely.ops import unary_union
 from shapely.geometry import Polygon, mapping
@@ -74,6 +75,14 @@ class Optimizer:
         #  there is using that code row because classes don't have similar lengths.
 
         self.probability_mask = np.array(self.probability_mask, dtype="object")
+        self.coefficients = np.array([])
+        self.best_evol_individuals = np.array([])
+
+        self.evol_optimization()
+        self.direct_optimization()
+        self.artist("test_gens.txt", 'test_values.txt', gen)  # Plot rendering and saving as GIF
+
+    def evol_optimization(self):
 
         evol_params = {
             'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
@@ -97,7 +106,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 30  # Maximal amount of pops
+        max_num_gens = 6  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -115,8 +124,47 @@ class Optimizer:
         print('Max fitness of population = ', es.get_best_individual_fitness())
         print('Best individual in population = ', es.get_best_individual())
         self.coefficients = es.get_coefficients()  # Getting found coefficients for recount getting plot result
+        self.best_evol_individuals = es.get_best_in_dynasties()
 
-        self.artist("test_gens.txt", 'test_values.txt', es.get_best_individual())  # Plot rendering and saving as GIF
+    def direct_optimization(self):
+
+        evol_params = {
+            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
+            'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
+            'bounds': self.bounds,  # limits or list of variants, which variable can be
+            'probability_mask': self.probability_mask,  # density of probability in bounds
+            'first_pop': self.best_evol_individuals,
+            'coefficients': self.coefficients
+        }
+
+        es = DirSearch(evol_params)  # Creating class for evolution search
+
+        '''OPTION 1
+        # execute the search for 100 generations
+        num_gens = 100
+        es.execute_search(num_gens)
+        '''
+
+        '''OPTION 2'''
+        # keep searching till a stopping condition is reached
+        num_gen = 0  # counter of pops
+        max_num_gens = 50  # Maximal amount of pops
+        desired_fitness = 0.05  # sufficient value of object function for finishing
+
+        es.step_generation()  # Creating the first population
+
+        #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
+        while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
+            print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
+            self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
+            self.save_dynasties(es.get_dynasties_best_value(),
+                                'test_values.txt')  # saving the best fitness values for each dynasties
+            es.step_generation()  # Creating new population
+            num_gen += 1
+
+        # print results
+        print('Max fitness of population = ', es.get_best_individual_fitness())
+        print('Best individual in population = ', es.get_best_individual())
 
     def get_light_coefficients(self):
         light_coeffs = []

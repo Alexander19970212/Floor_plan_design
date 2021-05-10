@@ -26,7 +26,7 @@ class DirSearch:
                 num_processes: int -  pool size for multiprocessing.pool.Pool - defaults to os.cpu_count()
         """
         # check for required keys
-        required_keys = ['calibration_function', 'fitness_function', "bounds",
+        required_keys = ['fitness_function', "bounds",
                          "probability_mask"]
         for key in required_keys:
             if key not in evol_params.keys():
@@ -34,14 +34,13 @@ class DirSearch:
 
         # checked for all required keys
         self.fitness_function = evol_params['fitness_function']
-        self.calibration_function = evol_params['calibration_function']
         self.probability_mask = evol_params['probability_mask']
         self.bounds = evol_params['bounds']
-        self.num_ind = evol_params['number_individuals']
         self.first_pop = evol_params['first_pop']
         self.coefficients = evol_params['coefficients']
         self.pop = self.first_pop.copy()
         self.pop_old = self.first_pop.copy()
+        self.num_ind = self.first_pop.shape[0]
 
         # create other required data
         self.num_processes = evol_params.get('num_processes', None)

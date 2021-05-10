@@ -45,6 +45,7 @@ class EvolSearch:
         self.coefficients = None
         self.num_processes = evol_params.get('num_processes', None)
         self.dynasties_best_values = []
+        self.best_in_dynasties = []
         self.best_gen = None
 
         # check for fitness function kwargs
@@ -228,6 +229,7 @@ class EvolSearch:
         new_pop = []  # void list for new population
         number_dynasty = 0  # counter of dynasties
         self.dynasties_best_values = []
+        self.best_in_dynasties = []
 
         # save best gen
         best_index = np.argsort(self.fitness * (-1))[-1:]
@@ -242,6 +244,7 @@ class EvolSearch:
             # initial of parents
             parents_indexes = np.argsort(fitness * (-1))[-self.elitist_fraction:]  # select parents
             bufer_pop = pop[parents_indexes, :]
+            self.best_in_dynasties.append(pop[np.argsort(fitness*(-1))[-1:]])
 
             #  saving best value
             self.dynasties_best_values.append(np.min(fitness))
@@ -318,6 +321,10 @@ class EvolSearch:
         returns 1D array of the genotype that has max fitness
         '''
         return self.best_gen
+
+    def get_best_in_dynasties(self):
+
+        return np.array(self.best_in_dynasties, dtype='object')
 
     def get_coefficients(self):
         return self.coefficients
