@@ -54,16 +54,17 @@ class Optimizer:
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
         self.max_diagonal = 200
         self.windows_lines = self.get_win_lines(self.windows, lines_index)
-        #self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]], [[0, 300], [150, 300]]])
-        #self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]]])
+        # self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]], [[0, 300], [150, 300]]])
+        # self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]]])
         #  That part of code is used for testing object function without GA.
 
-        # gen = self.gen_constructor()
-        # obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points, 150)
-        # mat_dist = self.get_minimal_dist_mat()
-        # object_distant_value, result_broken_gen, obj_dist = self.distant_between_classes(obj_classes, mat_dist)
-        # self.light_object_function(obj_centres, self.windows_lines, self.light_coefficients, gen)
-        # self.constructor_broken_gen(result_broken_gen, gen)
+        gen = self.gen_constructor()
+        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points, 150)
+        mat_dist = self.get_minimal_dist_mat()
+        object_distant_value, result_broken_gen, obj_dist, sep_val_dist = self.distant_between_classes(obj_classes,
+                                                                                                       mat_dist)
+        self.light_object_function(obj_centres, self.windows_lines, self.light_coefficients, gen)
+        self.constructor_broken_gen(result_broken_gen, gen)
 
         # gen = self.gen_constructor()
         # coefficients = self.calibration_function(gen)
@@ -261,13 +262,75 @@ class Optimizer:
 
         # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
         # sum amount if its
-        object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist)
-        light_distance_sum, broken_gen_light = self.light_object_function(obj_centres, self.windows_lines,
-                                                                          self.light_coefficients, gen)
+        object_distant_value, result_broken_gen, dist_value, sep_val_dist = self.distant_between_classes(obj_classes,
+                                                                                                         mat_dist)
+        light_distance_sum, broken_gen_light, sep_val_light = self.light_object_function(obj_centres,
+                                                                                         self.windows_lines,
+                                                                                         self.light_coefficients, gen)
         # getting full broken mask
         mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
 
         return np.array([object_distant_value, dist_value, light_distance_sum]), broken_gen_light
+
+    def funstion_for_sep(self, gen, weights):
+        """
+        The function gets gen, builds individual, analyzes it and creates mask list with broken parts.
+        :param gen: Numpy array - list of variables.
+        :return: list of penalty values and broken mask
+        """
+
+        x_vector = np.array(gen, dtype="object")
+        test_attention = np.array([0.1, 0.8, 0.1])  # influence penalty values to result
+
+        try:
+            # building floor plan which based on gen.
+            obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points,
+                                                    self.max_diagonal)  # list rectangles
+            mat_dist = self.get_minimal_dist_mat()  # getting matrix of minimal distant between classes
+
+            # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
+            # sum amount if its
+            object_distant_value, result_broken_gen, dist_value, sep_val_dist = self.distant_between_classes(obj_classes,
+                                                                                                             mat_dist)
+            light_distance_sum, broken_gen_light, sep_val_light = self.light_object_function(obj_centres,
+                                                                                             self.windows_lines,
+                                                                                             self.light_coefficients, gen)
+
+            vector_values = self.balancing_function([sep_val_dist, sep_val_light])
+
+            result = np.sum(test_attention * np.array([object_distant_value, dist_value, light_distance_sum]) / weights)
+
+            return [result, np.array(vector_values, dtype="object")]
+
+        except:
+            return [1, False]
+
+    def balancing_function(self, sep_values):
+
+        bufer_for_analyz = []
+        for val_funct in sep_values:
+            for_combine = []
+            for chr in val_funct:
+                for_combine.extend(chr)
+            bufer_for_analyz.append(for_combine)
+
+        bufer_for_analyz = np.array(bufer_for_analyz)
+
+        maxes = np.amax(bufer_for_analyz, axis=1)
+        coeff = np.prod(maxes)
+
+        coefficients = coeff/maxes
+
+        new_values = []
+        for val_funct, coeffinc in zip(sep_values, coefficients):
+            new_gen = []
+            for chr in val_funct:
+                new_gen.append(chr*coeffinc)
+            new_values.append(new_gen)
+
+        return new_values
+
+
 
     def calibration_function(self, x_vector):
         """
@@ -670,12 +733,15 @@ class Optimizer:
         object_distant = 0  # for disturbances sum
         number_classes = rects_classes.shape[0]
         broken_gens = []
+        sep_val_gen = []
+
         if flag_debug:
             print(minimal_distances)
 
         # check distances inside all couple of classes
         for i in range(number_classes):
             broken_gen = []
+            sep_val_chr = []
             for j in range(number_classes):
                 if i != j:
                     # get matrix with distances
@@ -683,6 +749,10 @@ class Optimizer:
 
                     # find position where distances are exceeded
                     distances_mistake = (distances < minimal_distances[i, j]) * 1
+                    mistake_value = (minimal_distances[i, j] - distances) * distances_mistake
+                    mistake_value = np.sum(mistake_value, axis=2)
+                    mistake_value = np.sum(mistake_value, axis=0)
+                    sep_val_chr.append(mistake_value)
 
                     # Sum disturbances
                     distances_mistake = np.sum(distances_mistake, axis=2)
@@ -691,6 +761,8 @@ class Optimizer:
                     # Save for couple
                     broken_gen.append(distances_mistake)
                     object_distant += np.sum(distances)
+
+            sep_val_gen.append(np.sum(sep_val_chr, axis=0))
             broken_gens.append(broken_gen)
 
         if flag_debug:
@@ -708,7 +780,7 @@ class Optimizer:
             # transform broken mask as part of chromosome
             result_broken_gen[chromosome_index] = (result_broken_gen[chromosome_index] >= 1) * 1
 
-        return object_distant_value, result_broken_gen, object_distant
+        return object_distant_value, result_broken_gen, object_distant, sep_val_gen
 
     def light_object_function(self, classes_centre_points, win_lines, light_coefficients, gen_ex):
         """
@@ -721,15 +793,17 @@ class Optimizer:
         """
         light_distance = []
         broken_gen = []
+        sep_val_gen = []
         for class_recs in classes_centre_points:
-            class_value, class_piece_broken_gen = self.light_function_for_class(class_recs, win_lines)
+            class_value, class_piece_broken_gen, sep_values_chr = self.light_function_for_class(class_recs, win_lines)
             light_distance.append(class_value)
             broken_gen.append(class_piece_broken_gen)
+            sep_val_gen.append(sep_values_chr)
 
         broken_gen = self.get_brokengen_light(broken_gen, gen_ex)
         light_distance_sum = np.sum(np.array(light_distance) * light_coefficients)
 
-        return light_distance_sum, broken_gen
+        return light_distance_sum, broken_gen, sep_val_gen
 
     def get_brokengen_light(self, parts_gen, example_gen):
         """
@@ -777,8 +851,8 @@ class Optimizer:
 
         h = (s / d) * 2
 
-        g_1_sqr = d_1_sqr - h**2
-        g_2_sqr = d_2_sqr - h**2
+        g_1_sqr = d_1_sqr - h ** 2
+        g_2_sqr = d_2_sqr - h ** 2
 
         g_1 = np.sqrt(g_1_sqr)
         g_2 = np.sqrt(g_2_sqr)
@@ -788,14 +862,14 @@ class Optimizer:
 
         mask_1 = (d_2_sqr < d_sqr + d_1_sqr) * 1
         mask_2 = (d_1_sqr < d_sqr + d_2_sqr) * 1
-        mask = ((mask_1 + mask_2) > 1) * 1    # mask  where have to be h
+        mask = ((mask_1 + mask_2) > 1) * 1  # mask  where have to be h
         anti_mask = (mask - 1) * -1
 
         d_corner_mask = (d_1 < d_2) * 1
         d_corner_anti_mask = (d_corner_mask - 1) * -1
         d_corner = dist_to_point_1 * d_corner_mask + dist_to_point_2 * d_corner_anti_mask
 
-        #d_corner = np.minimum(d_1, d_2)
+        # d_corner = np.minimum(d_1, d_2)
         min_dist = mask * h + anti_mask * d_corner
 
         # min_dist = np.sum(min_dist, axis=2)  # FOR 1 OPTION
@@ -806,7 +880,7 @@ class Optimizer:
         broken_gen = (min_dist > 0.4 * max_dist)
         value = np.sum(min_dist)
 
-        return value, broken_gen
+        return value, broken_gen, min_dist
 
     def constructor_broken_gen(self, parts_gen, example_gen):
         #  temprorary
@@ -876,7 +950,8 @@ class Optimizer:
 
             # delete later
             mat_dist = self.get_minimal_dist_mat()
-            object_distant_value, result_broken_gen, dist_value = self.distant_between_classes(obj_classes, mat_dist)
+            object_distant_value, result_broken_gen, dist_value, sep_val_dist = self.distant_between_classes(
+                obj_classes, mat_dist)
             # print('Distance', object_distant_value)
             # mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
             # D = np.array([object_distant_value, dist_value])
@@ -965,4 +1040,3 @@ if __name__ == "__main__":
     }
 
     Opt = Optimizer(Classes)
-

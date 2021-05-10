@@ -39,6 +39,7 @@ class DirSearch:
         self.bounds = evol_params['bounds']
         self.num_ind = evol_params['number_individuals']
         self.first_pop = evol_params['first_pop']
+        self.coefficients = evol_params['coefficients']
         self.pop = self.first_pop.copy()
         self.pop_old = self.first_pop.copy()
 
@@ -66,10 +67,13 @@ class DirSearch:
                 __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
 
         # returned list contains mask of broken genes and fitness value, so that is separated
-        self.fitness_old = np.array(self.fitness, dtype="object")  # transforming to numpy array
+        self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
+
+        self.dynasties_best_values = self.fitness[:, 0]  # extraction of mask for mutation
+        self.fitness_old = self.fitness[:, 1]  # remaining values are fitness values list
 
 
-        self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
+        # self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
         # save best gen
         best_index = np.argsort(self.dynasties_best_values * (-1))[-1:]
         # self.dynasties_best_values.append(self.pop[best_index])
@@ -139,6 +143,9 @@ class DirSearch:
         # returned list contains mask of broken genes and fitness value, so that is separated
         self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
 
+        self.fitness_values = self.fitness[:, 0]  # extraction of mask for mutation
+        self.fitness = self.fitness[:, 1]  # remaining values are fitness values list
+
         # balancing !!!!!!!!!!!!!!!!!!!!!!!!!
         best_pop = []
 
@@ -183,10 +190,14 @@ class DirSearch:
                 __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
 
         # returned list contains mask of broken genes and fitness value, so that is separated
-        self.fitness_old = np.array(self.fitness, dtype="object")  # transforming to numpy array
+        self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
+
+        self.dynasties_best_values = self.fitness[:, 0]  # extraction of mask for mutation
+        self.fitness_old = self.fitness[:, 1]  # remaining values are fitness values list
+
         self.pop_old = self.pop
 
-        self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
+        # self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
         # save best gen
         best_index = np.argsort(self.dynasties_best_values * (-1))[-1:]
         # self.dynasties_best_values.append(self.pop[best_index])
