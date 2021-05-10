@@ -106,7 +106,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 6  # Maximal amount of pops
+        max_num_gens = 2  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -130,7 +130,7 @@ class Optimizer:
 
         evol_params = {
             'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
-            'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
+            'fitness_function': self.function_for_sep,  # custom function defined to evaluate fitness of a solution
             'bounds': self.bounds,  # limits or list of variants, which variable can be
             'probability_mask': self.probability_mask,  # density of probability in bounds
             'first_pop': self.best_evol_individuals,
@@ -320,7 +320,7 @@ class Optimizer:
 
         return np.array([object_distant_value, dist_value, light_distance_sum]), broken_gen_light
 
-    def funstion_for_sep(self, gen, weights):
+    def function_for_sep(self, gen, weights):
         """
         The function gets gen, builds individual, analyzes it and creates mask list with broken parts.
         :param gen: Numpy array - list of variables.

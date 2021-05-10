@@ -41,6 +41,7 @@ class DirSearch:
         self.pop = self.first_pop.copy()
         self.pop_old = self.first_pop.copy()
         self.num_ind = self.first_pop.shape[0]
+        self.optional_args = None
 
         # create other required data
         self.num_processes = evol_params.get('num_processes', None)
@@ -51,8 +52,6 @@ class DirSearch:
         global __evolsearch_process_pool
         __evolsearch_process_pool = ProcessPool(self.num_processes)
         time.sleep(0.5)
-
-        global __evolsearch_process_pool
 
         # estimate fitness using multiprocessing pool
         if __evolsearch_process_pool:
@@ -175,7 +174,7 @@ class DirSearch:
 
         self.pop = best_pop
 
-        global __evolsearch_process_pool
+        # global __evolsearch_process_pool
 
         # estimate fitness using multiprocessing pool
         if __evolsearch_process_pool:
