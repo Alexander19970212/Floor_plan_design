@@ -86,7 +86,7 @@ class Optimizer:
 
         evol_params = {
             'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
-            'pop_size': 500,  # population size
+            'pop_size': 200,  # population size
             'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
             'calibration_function': self.calibration_function,
             'elitist_fraction': 2,  # fraction of population retained as is between generations
@@ -106,7 +106,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 2  # Maximal amount of pops
+        max_num_gens = 1  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -376,7 +376,17 @@ class Optimizer:
                 new_gen.append(chr*coeffinc)
             new_values.append(new_gen)
 
-        return new_values
+        #new_values = np.array(new_values, dtype="object")
+        balancing_values = new_values[0]
+        result_values = []
+
+        for index_funct in range(1, len(new_values)):
+            for chr, chr_bal in zip(new_values[index_funct], balancing_values):
+                result_values.append(chr + chr_bal)
+            balancing_values = result_values
+            result_values = []
+
+        return balancing_values
 
 
 

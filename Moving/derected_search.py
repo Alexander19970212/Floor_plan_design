@@ -38,8 +38,8 @@ class DirSearch:
         self.bounds = evol_params['bounds']
         self.first_pop = evol_params['first_pop']
         self.coefficients = evol_params['coefficients']
-        self.pop = self.first_pop.copy()
-        self.pop_old = self.first_pop.copy()
+        self.pop = np.squeeze(self.first_pop.copy())
+        self.pop_old = np.squeeze(self.first_pop.copy())
         self.num_ind = self.first_pop.shape[0]
         self.optional_args = None
 
@@ -170,9 +170,9 @@ class DirSearch:
 
                 best_gen.append(best_chr)
 
-            best_pop.append(best_gen)
+            best_pop.append(np.array(best_gen, dtype="object"))
 
-        self.pop = best_pop
+        self.pop = np.array(best_pop)
 
         # global __evolsearch_process_pool
 
