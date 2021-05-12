@@ -106,7 +106,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 1  # Maximal amount of pops
+        max_num_gens = 10  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -148,7 +148,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 50  # Maximal amount of pops
+        max_num_gens = 500  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -990,7 +990,7 @@ class Optimizer:
             fig, axs = plt.subplots(2)
             axs[0].axis('equal')
             axs[1].set_xlim(0, gens.shape[0])
-            axs[1].set_ylim(0.1, 0.71)
+            axs[1].set_ylim(0.1, 0.81)
 
             x_list = np.append(countur_coords[:, 0], countur_coords[0, 0])
             y_list = np.append(countur_coords[:, 1], countur_coords[0, 1])
@@ -998,8 +998,10 @@ class Optimizer:
 
             transformed_gen = []
             first_index = 0
-            for obj_class in gen_example[0]:
+            gen_example = np.array(gen_example, dtype='object')
+            for obj_class in gen_example:
                 length = obj_class.shape[0]
+
                 transformed_gen.append(gen[first_index:first_index + length])
                 first_index += length
 
