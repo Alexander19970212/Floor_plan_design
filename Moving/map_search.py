@@ -34,75 +34,26 @@ class DirSearch:
 
         # checked for all required keys
         self.fitness_function = evol_params['fitness_function']
-        self.probability_mask = evol_params['probability_mask']
-        self.bounds = evol_params['bounds']
-        self.first_pop = evol_params['first_pop']
+        self.function_get_other = evol_params['function_get_oth_indexes']
+        self.previous_gen = evol_params['first_gen']
         self.coefficients = evol_params['coefficients']
-        self.pop = np.squeeze(self.first_pop.copy())
-        self.pop_old = np.squeeze(self.first_pop.copy())
-        self.num_ind = self.first_pop.shape[0]
-        self.optional_args = None
+
+        #self.pop = np.squeeze(self.first_pop.copy())
+        #self.pop_old = np.squeeze(self.first_pop.copy())
 
         # create other required data
         self.num_processes = evol_params.get('num_processes', None)
         self.dynasties_best_values = []
         self.best_gen = None
+        self.class_index = 0
 
         # creating the global process pool to be used across all generations
         global __evolsearch_process_pool
         __evolsearch_process_pool = ProcessPool(self.num_processes)
         time.sleep(0.5)
 
-        # estimate fitness using multiprocessing pool
-        if __evolsearch_process_pool:
-            # pool exists
-            self.fitness = np.asarray(
-                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
-        else:
-            # re-create pool
-            __evolsearch_process_pool = Pool(self.num_processes)
-            self.fitness = np.asarray(
-                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
-
-        # returned list contains mask of broken genes and fitness value, so that is separated
-        self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
-
-        self.dynasties_best_values = self.fitness[:, 0]  # extraction of mask for mutation
-        self.fitness_old = self.fitness[:, 1]  # remaining values are fitness values list
-
-
-        # self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
-        # save best gen
-        best_index = np.argsort(self.dynasties_best_values * (-1))[-1:]
-        # self.dynasties_best_values.append(self.pop[best_index])
-        self.best_gen = self.pop_old[1] #best_index]
-
-    def gen_genartion(self):
-        """
-        The function creates gen according probability distribution
-        :return: list - generated gen that contains chromosomes
-        """
-        big_gen = []  # void list for appending chromosomes
-        for net_mask, net_doubt in zip(self.probability_mask, self.bounds):  # cycle over chromosomes
-            net_gen = []  # chromosome - void list for appending variables
-            for probability, value_slot in zip(net_mask, net_doubt):  # cycle over variables
-
-                #  appending variable from slot with offset distribution
-                if type(probability) is float or type(probability) is int:
-                    net_gen.append(random.triangular(value_slot[0], value_slot[1],
-                                                     value_slot[0] + (value_slot[1] - value_slot[0]) * probability))
-
-                #  appending variable from slot with equally distribution
-                elif type(probability) is str:
-                    net_gen.append(random.uniform(value_slot[0], value_slot[1]))
-
-                #  appending variable from list for choice
-                else:
-                    net_gen.append(random.choices(value_slot, cum_weights=probability, k=1)[0])
-
-            big_gen.append(net_gen)  # appending created chromosome
-
-        return big_gen
+    def set_class_for_opt(self, class_index):
+        self.class_index = class_index
 
     def evaluate_fitness(self, individual_index):
         """
@@ -123,7 +74,25 @@ class DirSearch:
         evaluate fitness of pop, and create new pop after crossing and mutation
         """
         # create initial data of evolutionary search
-        self.pop = np.array([self.gen_genartion() for i in range(self.first_pop.shape[0])], dtype='object')
+        values = self.fitness_function(self.best_gen, self.coefficients)
+        res = values[0]
+        res_sep = values[1]
+
+        worse_ind = np.argsort(res_sep[self.class_index] * (-1))[-1:]
+        other_indexes = self.function_get_other(self.class_index, worse_ind)
+
+        amount_other_indexes = other_indexes.shape[0]
+
+        pop_bufer = np.repeat(self.best_gen, amount_other_indexes, axis=0)
+
+        new_pop = []
+        for gen, rep in zip(pop_bufer, other_indexes):
+            gen[self.class_index][9 + worse_ind] = rep
+            new_pop.append(gen)
+
+        new_pop.append(self.best_gen)
+
+        self.pop = np.array(new_pop, dtype="object")
 
         global __evolsearch_process_pool
 

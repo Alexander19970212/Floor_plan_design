@@ -48,12 +48,12 @@ class Optimizer:
         # self.windows = np.array(
         #     [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
         #      [[100, 75], [165, 45]]])
-        lines_index = [0, 1, 2, 3, 4]
+        lines_index = [3, 4, 5]
         self.windows = np.array([[(7, 15), (7, 22), (20, 22), (20, 15)], [(4, 8), (4, 18), (12, 18), (12, 8)],
                                  [(7, 4), (7, 11), (20, 11), (20, 4)]]) * 10
 
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
-        self.max_diagonal = 200
+        self.max_diagonal = 400
         self.windows_lines = self.get_win_lines(self.windows, lines_index)
         # self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]], [[0, 300], [150, 300]]])
         # self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]]])
@@ -106,7 +106,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 10  # Maximal amount of pops
+        max_num_gens = 30  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -114,15 +114,15 @@ class Optimizer:
         #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
         while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
             print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
-            self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
+            self.save_best_gen(es.get_best_individual()[0], "test_gens.txt")  # saving the best individual
             self.save_dynasties(es.get_dynasties_best_value(),
                                 'test_values.txt')  # saving the best fitness values for each dynasties
             es.step_generation()  # Creating new population
             num_gen += 1
 
         # print results
-        print('Max fitness of population = ', es.get_best_individual_fitness())
-        print('Best individual in population = ', es.get_best_individual())
+        # print('Max fitness of population = ', es.get_best_individual_fitness())
+        # print('Best individual in population = ', es.get_best_individual())
         self.coefficients = es.get_coefficients()  # Getting found coefficients for recount getting plot result
         self.best_evol_individuals = es.get_best_in_dynasties()
 
@@ -163,8 +163,8 @@ class Optimizer:
             num_gen += 1
 
         # print results
-        print('Max fitness of population = ', es.get_best_individual_fitness())
-        print('Best individual in population = ', es.get_best_individual())
+        # print('Max fitness of population = ', es.get_best_individual_fitness())
+        # print('Best individual in population = ', es.get_best_individual())
 
     def get_light_coefficients(self):
         light_coeffs = []
@@ -348,7 +348,7 @@ class Optimizer:
 
             result = np.sum(test_attention * np.array([object_distant_value, dist_value, light_distance_sum]) / weights)
 
-            return [result, np.array(vector_values, dtype="object")]
+            return [result, np.array(sep_val_light, dtype="object")]
 
         except:
             return [1, False]
@@ -408,7 +408,7 @@ class Optimizer:
         :return: float (0-1) - fitness values, numpy array - broken mask
         """
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.1, 0.8, 0.1])  # influence penalty values to result
+        test_attention = np.array([0.45, 0.45, 0.1])  # influence penalty values to result
 
         try:
             penalties, mask = self.test_function(x_vector)  # getting list penalty values and broken mask
@@ -650,7 +650,7 @@ class Optimizer:
             selected_indexes.append(founded_index)
             all_indexes.remove(founded_index)
 
-        return drops[selected_indexes]
+        return drops[selected_indexes], all_indexes/drops.shape[0]
 
     def locate_objects(self, rects, centre_points):
         """
@@ -732,7 +732,7 @@ class Optimizer:
             centre_points = self.sorting_drops_bydistant(grid, main_point)  # Sorting by distant from main point
 
             #  get cells for location according locations' indexes
-            centre_points = self.get_centre_points_option_4(centre_points, locations_indexes)
+            centre_points, other_indexes = self.get_centre_points_option_4(centre_points, locations_indexes)
 
             # Get rotated rectangles according angles' list
             rectangles = self.get_objects_angle(amount, p_x, p_y, objects_angles)
@@ -853,7 +853,7 @@ class Optimizer:
         broken_gen = []
         sep_val_gen = []
         for class_recs in classes_centre_points:
-            class_value, class_piece_broken_gen, sep_values_chr = self.light_function_for_class(class_recs, win_lines)
+            class_value, class_piece_broken_gen, sep_values_chr = self.light_function_angle_for_class(class_recs, win_lines)
             light_distance.append(class_value)
             broken_gen.append(class_piece_broken_gen)
             sep_val_gen.append(sep_values_chr)
@@ -940,6 +940,48 @@ class Optimizer:
 
         return value, broken_gen, min_dist
 
+    def light_function_angle_for_class(self, rects_centres, windows):
+        """
+        THe function calculates distances' sum for each rectangles in class to all windows.
+        :param rects_centres: numpy array - list with rectangles' centres' coords
+        :param windows: list - list with edges' coords of windows
+        :return: float - sum of distances (sum of minimal distances),
+                    list - '1' where distances more then 10 cent of max.
+        """
+        rects_centres = rects_centres[np.newaxis, :, :]
+        windows = windows[np.newaxis, :, :, :]
+        rects_centres = np.repeat(rects_centres, windows.shape[1], axis=0)
+        windows = np.transpose(np.repeat(windows, rects_centres.shape[1], axis=0),
+                               [1, 0, 2, 3])  # DEB check tranpose for many axis
+
+        d_1_sqr = (rects_centres[:, :, 0] - windows[:, :, 0, 0]) ** 2 + (
+                rects_centres[:, :, 1] - windows[:, :, 0, 1]) ** 2
+        d_2_sqr = (rects_centres[:, :, 0] - windows[:, :, 1, 0]) ** 2 + (
+                rects_centres[:, :, 1] - windows[:, :, 1, 1]) ** 2
+
+        d_sqr = (windows[:, :, 0, 0] - windows[:, :, 1, 0]) ** 2 + (windows[:, :, 0, 1] - windows[:, :, 1, 1]) ** 2
+
+        d_1 = np.sqrt(d_1_sqr)
+        d_2 = np.sqrt(d_2_sqr)
+        d = np.sqrt(d_sqr)
+
+        cos_a = -(d_sqr - d_1_sqr - d_2_sqr) / (2 * d_1 * d_2)
+
+        #obtus_mask = (cos_a > 0) * 1
+        angles = np.arccos(cos_a)
+
+        weight_angle = 3.142 - angles
+
+        # min_dist = np.sum(min_dist, axis=2)  # FOR 1 OPTION
+        min_dist = np.amin(weight_angle, axis=0)  # DEBBB
+
+        max_dist = np.amax(min_dist)
+
+        broken_gen = (min_dist > 0.8 * max_dist)
+        value = np.sum(min_dist)
+
+        return value, broken_gen, min_dist
+
     def constructor_broken_gen(self, parts_gen, example_gen):
         #  temprorary
         amount_intersections = 0
@@ -987,10 +1029,11 @@ class Optimizer:
 
         for gen, values, i in zip(gens, dynasties_values, range(gens.shape[0])):
 
+            print("Plot_number_", i)
             fig, axs = plt.subplots(2)
             axs[0].axis('equal')
             axs[1].set_xlim(0, gens.shape[0])
-            axs[1].set_ylim(0.1, 0.81)
+            axs[1].set_ylim(0.1, 0.91)
 
             x_list = np.append(countur_coords[:, 0], countur_coords[0, 0])
             y_list = np.append(countur_coords[:, 1], countur_coords[0, 1])
@@ -1000,7 +1043,7 @@ class Optimizer:
             first_index = 0
             gen_example = np.array(gen_example, dtype='object')
             for obj_class in gen_example:
-                length = obj_class.shape[0]
+                length = len(obj_class)
 
                 transformed_gen.append(gen[first_index:first_index + length])
                 first_index += length
@@ -1009,9 +1052,9 @@ class Optimizer:
             obj_classes, obj_centres = self.builder(transformed_gen, self.windows, self.main_points, 150)
 
             # delete later
-            mat_dist = self.get_minimal_dist_mat()
-            object_distant_value, result_broken_gen, dist_value, sep_val_dist = self.distant_between_classes(
-                obj_classes, mat_dist)
+            #mat_dist = self.get_minimal_dist_mat()
+            #object_distant_value, result_broken_gen, dist_value, sep_val_dist = self.distant_between_classes(
+            #    obj_classes, mat_dist)
             # print('Distance', object_distant_value)
             # mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
             # D = np.array([object_distant_value, dist_value])
@@ -1036,7 +1079,7 @@ class Optimizer:
 
         if type_draw == 'all':
             print('Udate Images', gens.shape[0])
-            names = [f"Scrins/band{band}.jpg" for band in range(0, gens.shape[0], 5)]
+            names = [f"Scrins/band{band}.jpg" for band in range(0, gens.shape[0], 2)]
             images = [Image.open(f) for f in names]
             images = [image.convert("P", palette=Image.ADAPTIVE) for image in images]
             fp_out = "image.gif"
@@ -1044,7 +1087,7 @@ class Optimizer:
 
             img = images[0]
             img.save(fp=fp_out, format="GIF", append_images=images[1:], save_all=True,
-                     duration=int(gif_time / gens.shape[0]),
+                     duration=100, #int(gif_time / gens.shape[0]),
                      loop=0)
 
     def save_dynasties(self, values, filename="Dynasties_values"):
@@ -1063,7 +1106,7 @@ class Optimizer:
         try:
             with open(filename, "a") as file_values:
                 file_values.write('\n')
-                for obj_class in gen[0]:
+                for obj_class in gen: #[0]:
                     for item in obj_class:
                         file_values.write("%s\t" % item)
 
@@ -1080,7 +1123,7 @@ if __name__ == "__main__":
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                       "Classes_for_distant": {"Machine_tool": 40, "Printers": 20}},
-        'Printers': {"Amount": 7, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
+        'Printers': {"Amount": 10, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
                      "Need_lighting": 9,
                      "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
                      "Classes_for_distant": {"Machine_tool": 50, "Workplace": 2}},
@@ -1093,7 +1136,7 @@ if __name__ == "__main__":
         #          "Classes_for_short_path": [None],
         #          "Classes_ignored_intersections": ["Workplace", "Printers", "Cabinets", "Machine_tool"],
         #          "Classes_for_distant": {None}},
-        'Machine_tool': {"Amount": 10, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
+        'Machine_tool': {"Amount": 6, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
                          "Need_lighting": 1,
                          "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                          "Classes_for_distant": {"Workplace": 40, "Printers": 50, "Cabinets": 5}}
