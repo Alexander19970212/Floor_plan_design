@@ -43,6 +43,7 @@ class DirSearch:
         self.num_ind = self.first_pop.shape[0]
         self.optional_args = None
 
+
         # create other required data
         self.num_processes = evol_params.get('num_processes', None)
         self.dynasties_best_values = []

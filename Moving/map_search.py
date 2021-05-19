@@ -7,7 +7,7 @@ from pathos.multiprocessing import ProcessPool
 __evolsearch_process_pool = None
 
 
-class DirSearch:
+class MapSearch:
     def __init__(self, evol_params):
         """
         Initialize evolutionary search
@@ -26,8 +26,7 @@ class DirSearch:
                 num_processes: int -  pool size for multiprocessing.pool.Pool - defaults to os.cpu_count()
         """
         # check for required keys
-        required_keys = ['fitness_function', "bounds",
-                         "probability_mask"]
+        required_keys = ['fitness_function', 'function_get_oth_indexes', 'first_gen', 'coefficients']
         for key in required_keys:
             if key not in evol_params.keys():
                 raise Exception('Argument evol_params does not contain the following required key: ' + key)
@@ -35,7 +34,7 @@ class DirSearch:
         # checked for all required keys
         self.fitness_function = evol_params['fitness_function']
         self.function_get_other = evol_params['function_get_oth_indexes']
-        self.previous_gen = evol_params['first_gen']
+        self.best_gen = evol_params['first_gen']
         self.coefficients = evol_params['coefficients']
 
         #self.pop = np.squeeze(self.first_pop.copy())
@@ -44,7 +43,7 @@ class DirSearch:
         # create other required data
         self.num_processes = evol_params.get('num_processes', None)
         self.dynasties_best_values = []
-        self.best_gen = None
+        #self.best_gen = None
         self.class_index = 0
 
         # creating the global process pool to be used across all generations
@@ -54,6 +53,9 @@ class DirSearch:
 
     def set_class_for_opt(self, class_index):
         self.class_index = class_index
+
+    def set_gen_for_opt(self, gen):
+        self.gen = gen
 
     def evaluate_fitness(self, individual_index):
         """
@@ -78,8 +80,8 @@ class DirSearch:
         res = values[0]
         res_sep = values[1]
 
-        worse_ind = np.argsort(res_sep[self.class_index] * (-1))[-1:]
-        other_indexes = self.function_get_other(self.class_index, worse_ind)
+        worse_ind = np.argsort(res_sep[self.class_index] )[-1:] #!!!!!!!!!!!!!!!!!!!
+        other_indexes = self.function_get_other(self.best_gen, self.class_index, worse_ind)
 
         amount_other_indexes = other_indexes.shape[0]
 
@@ -100,12 +102,12 @@ class DirSearch:
         if __evolsearch_process_pool:
             # pool exists
             self.fitness = np.asarray(
-                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
+                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(amount_other_indexes+1)))
         else:
             # re-create pool
             __evolsearch_process_pool = Pool(self.num_processes)
             self.fitness = np.asarray(
-                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
+                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(amount_other_indexes+1)))
 
         # returned list contains mask of broken genes and fitness value, so that is separated
         self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
@@ -113,62 +115,20 @@ class DirSearch:
         self.fitness_values = self.fitness[:, 0]  # extraction of mask for mutation
         self.fitness = self.fitness[:, 1]  # remaining values are fitness values list
 
-        # balancing !!!!!!!!!!!!!!!!!!!!!!!!!
-        best_pop = []
+        list_values_by_place = []
 
-        for gen, gen_old, gen_fit, gen_fit_old in zip(self.pop, self.pop_old, self.fitness, self.fitness_old):
-            best_gen = []
-            for chr, chr_old, chr_fit, chr_fit_old in zip(gen, gen_old, gen_fit, gen_fit_old):
-                locations_angles_amount = len(chr[9:])
+        for gen in self.fitness:
+            list_values_by_place.append(gen[self.class_index][worse_ind])
 
-                chr_ind = chr[9:int(9 + locations_angles_amount / 2)]
-                chr_angl = chr[int(9 + locations_angles_amount / 2):]
+        best_index = np.argsort(list_values_by_place * (-1))[-1:]
+        self.best_gen = self.pop[best_index]
 
-                chr_old_ind = chr_old[9:int(9 + locations_angles_amount / 2)]
-                chr_old_angl = chr_old[int(9 + locations_angles_amount / 2):]
+        self.dynasties_best_values = self.fitness[:, 0][0:4]  # extraction of mask for mutation
 
-                mask_superiority = (chr_fit < chr_fit_old) * 1
-                anti_mask_superiority = (mask_superiority - 1) * (-1)
-
-                best_chr_ind = chr_ind * mask_superiority + chr_old_ind * anti_mask_superiority
-                best_chr_angl = chr_angl * mask_superiority + chr_old_angl * anti_mask_superiority
-
-                best_chr = chr_old.copy()
-                best_chr[9:int(9 + locations_angles_amount / 2)] = best_chr_ind
-                best_chr[int(9 + locations_angles_amount / 2):] = best_chr_angl
-
-                best_gen.append(best_chr)
-
-            best_pop.append(np.array(best_gen, dtype="object"))
-
-        self.pop = np.array(best_pop)
-
-        # global __evolsearch_process_pool
-
-        # estimate fitness using multiprocessing pool
-        if __evolsearch_process_pool:
-            # pool exists
-            self.fitness = np.asarray(
-                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
-        else:
-            # re-create pool
-            __evolsearch_process_pool = Pool(self.num_processes)
-            self.fitness = np.asarray(
-                __evolsearch_process_pool.map(self.evaluate_fitness, np.arange(self.num_ind)))
-
-        # returned list contains mask of broken genes and fitness value, so that is separated
-        self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
-
-        self.dynasties_best_values = self.fitness[:, 0]  # extraction of mask for mutation
-        self.fitness_old = self.fitness[:, 1]  # remaining values are fitness values list
-
-        self.pop_old = self.pop
 
         # self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
         # save best gen
-        best_index = np.argsort(self.dynasties_best_values * (-1))[-1:]
         # self.dynasties_best_values.append(self.pop[best_index])
-        self.best_gen = self.pop_old[1]   #best_index]
 
     def get_dynasties_best_value(self):
         return self.dynasties_best_values

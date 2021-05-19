@@ -3,6 +3,7 @@ import random
 import matplotlib.pyplot as plt
 from evolutionary_search import EvolSearch
 from derected_search import DirSearch
+from map_search import MapSearch
 from PIL import Image
 from shapely.ops import unary_union
 from shapely.geometry import Polygon, mapping
@@ -80,6 +81,7 @@ class Optimizer:
 
         self.evol_optimization()
         self.direct_optimization()
+        self.map_optimization()
         self.artist("test_gens.txt", 'test_values.txt', gen)  # Plot rendering and saving as GIF
 
     def evol_optimization(self):
@@ -106,7 +108,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 30  # Maximal amount of pops
+        max_num_gens = 3  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -148,6 +150,46 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
+        max_num_gens = 10  # Maximal amount of pops
+        desired_fitness = 0.05  # sufficient value of object function for finishing
+
+        es.step_generation()  # Creating the first population
+
+        #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
+        while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
+            print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
+            self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
+            self.save_dynasties(es.get_dynasties_best_value(),
+                                'test_values.txt')  # saving the best fitness values for each dynasties
+            es.step_generation()  # Creating new population
+            num_gen += 1
+
+        # print results
+        # print('Max fitness of population = ', es.get_best_individual_fitness())
+        # print('Best individual in population = ', es.get_best_individual())
+        self.best_evol_individuals = es.get_best_in_dynasties()
+
+    def map_optimization(self):
+
+        evol_params = {
+            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
+            'fitness_function': self.function_for_sep,  # custom function defined to evaluate fitness of a solution
+            'first_pop': self.best_evol_individuals,
+            'coefficients': self.coefficients,
+            'function_get_oth_indexes': self.function_get_oth_indexes
+        }
+
+        es = MapSearch(evol_params)  # Creating class for evolution search
+
+        '''OPTION 1
+        # execute the search for 100 generations
+        num_gens = 100
+        es.execute_search(num_gens)
+        '''
+
+        '''OPTION 2'''
+        # keep searching till a stopping condition is reached
+        num_gen = 0  # counter of pops
         max_num_gens = 500  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
@@ -165,6 +207,7 @@ class Optimizer:
         # print results
         # print('Max fitness of population = ', es.get_best_individual_fitness())
         # print('Best individual in population = ', es.get_best_individual())
+
 
     def get_light_coefficients(self):
         light_coeffs = []
@@ -320,6 +363,42 @@ class Optimizer:
 
         return np.array([object_distant_value, dist_value, light_distance_sum]), broken_gen_light
 
+    def function_get_oth_indexes(self, gen, class_ind, obj_ind):
+        x_vector = np.array(gen, dtype="object")
+        try:
+            object_class = []
+            object_centres = []
+            #  classes of objects are built separately
+
+            chromosome = gen[class_ind]
+            main_point = self.main_points[class_ind]
+            # gen parsing
+            p_x, p_y = chromosome[0], chromosome[1]
+            offset_x, offset_y = chromosome[2], chromosome[3]
+            n_x, n_y = chromosome[4], chromosome[5]
+            off2_x, off2_y = chromosome[6], chromosome[7]
+            grid_angle = chromosome[8]
+            locations_angles_amount = len(chromosome[9:])
+            locations_indexes = chromosome[9:int(9 + locations_angles_amount / 2)]
+            objects_angles = chromosome[int(9 + locations_angles_amount / 2):]
+            amount = len(objects_angles)
+
+            # Get grid that is covering all space.
+            previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], self.max_diagonal, int(n_x), p_x, off2_x,
+                                                 int(n_y), p_x, off2_y, grid_angle)
+
+            # Remove points which are outside counter.
+            grid = self.cut_by_some_rectangles(previous_grid, self.windows)
+
+            centre_points = self.sorting_drops_bydistant(grid, main_point)  # Sorting by distant from main point
+
+            #  get cells for location according locations' indexes
+            centre_points, other_indexes = self.get_centre_points_option_4(centre_points, locations_indexes)
+
+            return other_indexes
+        except:
+            return [obj_ind]
+
     def function_for_sep(self, gen, weights):
         """
         The function gets gen, builds individual, analyzes it and creates mask list with broken parts.
@@ -387,8 +466,6 @@ class Optimizer:
             result_values = []
 
         return balancing_values
-
-
 
     def calibration_function(self, x_vector):
         """
