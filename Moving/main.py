@@ -164,17 +164,17 @@ class Optimizer:
             es.step_generation()  # Creating new population
             num_gen += 1
 
-        # print results
+            # print results
         # print('Max fitness of population = ', es.get_best_individual_fitness())
         # print('Best individual in population = ', es.get_best_individual())
-        self.best_evol_individuals = es.get_best_in_dynasties()
+        self.best_evol_individuals = es.get_best_individual()
 
     def map_optimization(self):
 
         evol_params = {
             'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
             'fitness_function': self.function_for_sep,  # custom function defined to evaluate fitness of a solution
-            'first_pop': self.best_evol_individuals,
+            'first_gen': self.best_evol_individuals,
             'coefficients': self.coefficients,
             'function_get_oth_indexes': self.function_get_oth_indexes
         }
@@ -190,7 +190,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 500  # Maximal amount of pops
+        max_num_gens = 5  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -727,7 +727,9 @@ class Optimizer:
             selected_indexes.append(founded_index)
             all_indexes.remove(founded_index)
 
-        return drops[selected_indexes], all_indexes/drops.shape[0]
+        all_indexes = np.array(all_indexes)/drops.shape[0]
+
+        return drops[selected_indexes], all_indexes
 
     def locate_objects(self, rects, centre_points):
         """
