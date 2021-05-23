@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import copy
 import time
 
 from pathos.multiprocessing import ProcessPool
@@ -45,6 +46,7 @@ class MapSearch:
         self.dynasties_best_values = []
         #self.best_gen = None
         self.class_index = 0
+        self.optional_args = None
 
         # creating the global process pool to be used across all generations
         global __evolsearch_process_pool
@@ -85,12 +87,18 @@ class MapSearch:
 
         amount_other_indexes = other_indexes.shape[0]
 
-        pop_bufer = np.repeat(self.best_gen, amount_other_indexes, axis=0)
+        best_gen = self.best_gen[np.newaxis, :]
+        pop_bufer = np.repeat(best_gen, amount_other_indexes, axis=0)
 
         new_pop = []
-        for gen, rep in zip(pop_bufer, other_indexes):
-            gen[self.class_index][9 + worse_ind] = rep
-            new_pop.append(gen)
+        for gen, rep, i in zip(pop_bufer, other_indexes, range(amount_other_indexes)):
+            #chr_chg = gen[self.class_index]
+            #chr_chg[9 + int(worse_ind)] = rep
+            #pop_bufer[i, self.class_index]=chr_chg
+            gen_chg = copy.deepcopy(self.best_gen)
+            #gen_chg = gen_chg[0]
+            gen_chg[self.class_index][9+int(worse_ind)] = rep
+            new_pop.append(gen_chg)
 
         new_pop.append(self.best_gen)
 
@@ -117,13 +125,13 @@ class MapSearch:
 
         list_values_by_place = []
 
-        for gen in self.fitness:
-            list_values_by_place.append(gen[self.class_index][worse_ind])
+        # for gen in self.fitness:
+            # list_values_by_place.append(gen[self.class_index][worse_ind])
 
-        best_index = np.argsort(list_values_by_place * (-1))[-1:]
-        self.best_gen = self.pop[best_index]
+        best_index = np.argsort(self.fitness_values * (-1))[-1:]
+        self.best_gen = self.pop[best_index[0]]
 
-        self.dynasties_best_values = self.fitness[:, 0][0:4]  # extraction of mask for mutation
+        self.dynasties_best_values = [1, 1, 1, 1]*self.fitness_values[best_index]  # extraction of mask for mutation
 
 
         # self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
