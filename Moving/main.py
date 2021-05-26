@@ -54,14 +54,14 @@ class Optimizer:
                                  [(7, 4), (7, 11), (20, 11), (20, 4)]]) * 10
 
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45]])
-        self.max_diagonal = 400
+        self.max_diagonal = 300
         self.windows_lines = self.get_win_lines(self.windows, lines_index)
         # self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]], [[0, 300], [150, 300]]])
         # self.windows_lines = np.array([[[150, 0], [0, 0]], [[0, 0], [0, 300]]])
         #  That part of code is used for testing object function without GA.
 
         gen = self.gen_constructor()
-        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points, 150)
+        obj_classes, obj_centres, obj_all_centress = self.builder(gen, self.windows, self.main_points, self.max_diagonal)
         mat_dist = self.get_minimal_dist_mat()
         object_distant_value, result_broken_gen, obj_dist, sep_val_dist = self.distant_between_classes(obj_classes,
                                                                                                        mat_dist)
@@ -108,7 +108,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 3  # Maximal amount of pops
+        max_num_gens = 5  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -150,7 +150,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 5  # Maximal amount of pops
+        max_num_gens = 30  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -171,6 +171,8 @@ class Optimizer:
 
     def map_optimization(self):
 
+        strategy_list = [0, 1, 2, 1, 2, 0]
+
         evol_params = {
             'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
             'fitness_function': self.function_for_sep,  # custom function defined to evaluate fitness of a solution
@@ -190,24 +192,26 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 20  # Maximal amount of pops
+        max_num_gens = 5  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
 
-        #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
-        while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
-            print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
-            self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
-            self.save_dynasties(es.get_dynasties_best_value(),
-                                'test_values.txt')  # saving the best fitness values for each dynasties
-            es.step_generation()  # Creating new population
-            num_gen += 1
+        for cl_obj in strategy_list:
+            es.set_class_for_opt(cl_obj)
+            num_gen = 0
+            #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
+            while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
+                print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
+                self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
+                self.save_dynasties(es.get_dynasties_best_value(),
+                                    'test_values.txt')  # saving the best fitness values for each dynasties
+                es.step_generation()  # Creating new population
+                num_gen += 1
 
         # print results
         # print('Max fitness of population = ', es.get_best_individual_fitness())
         # print('Best individual in population = ', es.get_best_individual())
-
 
     def get_light_coefficients(self):
         light_coeffs = []
@@ -347,8 +351,8 @@ class Optimizer:
         :return: list of penalty values and broken mask
         """
         # building floor plan which based on gen.
-        obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points,
-                                                self.max_diagonal)  # list rectangles
+        obj_classes, obj_centres, obj_all_centress = self.builder(gen, self.windows, self.main_points,
+                                                                  self.max_diagonal)  # list rectangles
         mat_dist = self.get_minimal_dist_mat()  # getting matrix of minimal distant between classes
 
         # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
@@ -384,7 +388,8 @@ class Optimizer:
             amount = len(objects_angles)
 
             # Get grid that is covering all space.
-            previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], self.max_diagonal, int(n_x), p_x, off2_x,
+            previous_grid = self.get_cells_grids(main_point, [offset_x, offset_y], self.max_diagonal, int(n_x), p_x,
+                                                 off2_x,
                                                  int(n_y), p_x, off2_y, grid_angle)
 
             # Remove points which are outside counter.
@@ -407,21 +412,23 @@ class Optimizer:
         """
 
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.1, 0.8, 0.1])  # influence penalty values to result
+        test_attention = np.array([0.4, 0.5, 0.1])  # influence penalty values to result
 
         try:
             # building floor plan which based on gen.
-            obj_classes, obj_centres = self.builder(gen, self.windows, self.main_points,
-                                                    self.max_diagonal)  # list rectangles
+            obj_classes, obj_centres, obj_all_centress = self.builder(gen, self.windows, self.main_points,
+                                                                      self.max_diagonal)  # list rectangles
             mat_dist = self.get_minimal_dist_mat()  # getting matrix of minimal distant between classes
 
             # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
             # sum amount if its
-            object_distant_value, result_broken_gen, dist_value, sep_val_dist = self.distant_between_classes(obj_classes,
-                                                                                                             mat_dist)
+            object_distant_value, result_broken_gen, dist_value, sep_val_dist = self.distant_between_classes(
+                obj_classes,
+                mat_dist)
             light_distance_sum, broken_gen_light, sep_val_light = self.light_object_function(obj_centres,
                                                                                              self.windows_lines,
-                                                                                             self.light_coefficients, gen)
+                                                                                             self.light_coefficients,
+                                                                                             gen)
 
             vector_values = self.balancing_function([sep_val_dist, sep_val_light])
 
@@ -446,16 +453,16 @@ class Optimizer:
         maxes = np.amax(bufer_for_analyz, axis=1)
         coeff = np.prod(maxes)
 
-        coefficients = coeff/maxes
+        coefficients = coeff / maxes
 
         new_values = []
         for val_funct, coeffinc in zip(sep_values, coefficients):
             new_gen = []
             for chr in val_funct:
-                new_gen.append(chr*coeffinc)
+                new_gen.append(chr * coeffinc)
             new_values.append(new_gen)
 
-        #new_values = np.array(new_values, dtype="object")
+        # new_values = np.array(new_values, dtype="object")
         balancing_values = new_values[0]
         result_values = []
 
@@ -727,7 +734,7 @@ class Optimizer:
             selected_indexes.append(founded_index)
             all_indexes.remove(founded_index)
 
-        all_indexes = np.array(all_indexes)/drops.shape[0]
+        all_indexes = np.array(all_indexes) / drops.shape[0]
 
         return drops[selected_indexes], all_indexes
 
@@ -788,6 +795,7 @@ class Optimizer:
 
         object_class = []
         object_centres = []
+        object_all_centres = []
         #  classes of objects are built separately
         for chromosome, main_point, color in zip(gen, main_points, colors):
             # gen parsing
@@ -808,10 +816,10 @@ class Optimizer:
             # Remove points which are outside counter.
             grid = self.cut_by_some_rectangles(previous_grid, windows)
 
-            centre_points = self.sorting_drops_bydistant(grid, main_point)  # Sorting by distant from main point
+            centre_points_pre = self.sorting_drops_bydistant(grid, main_point)  # Sorting by distant from main point
 
             #  get cells for location according locations' indexes
-            centre_points, other_indexes = self.get_centre_points_option_4(centre_points, locations_indexes)
+            centre_points, other_indexes = self.get_centre_points_option_4(centre_points_pre, locations_indexes)
 
             # Get rotated rectangles according angles' list
             rectangles = self.get_objects_angle(amount, p_x, p_y, objects_angles)
@@ -828,9 +836,10 @@ class Optimizer:
 
             object_class.append(rects)
             object_centres.append(centre_points)
-
+            object_all_centres.append(centre_points_pre)
         #  plt.show()
-        return np.array(object_class, dtype='object'), np.array(object_centres, dtype='object')
+        return np.array(object_class, dtype='object'), np.array(object_centres, dtype='object'), np.array(
+            object_all_centres, dtype='object')
 
     def distant_between_two_classes(self, rects_1, rects_2):
         """
@@ -932,7 +941,8 @@ class Optimizer:
         broken_gen = []
         sep_val_gen = []
         for class_recs in classes_centre_points:
-            class_value, class_piece_broken_gen, sep_values_chr = self.light_function_angle_for_class(class_recs, win_lines)
+            class_value, class_piece_broken_gen, sep_values_chr = self.light_function_angle_for_class(class_recs,
+                                                                                                      win_lines)
             light_distance.append(class_value)
             broken_gen.append(class_piece_broken_gen)
             sep_val_gen.append(sep_values_chr)
@@ -1046,7 +1056,7 @@ class Optimizer:
 
         cos_a = -(d_sqr - d_1_sqr - d_2_sqr) / (2 * d_1 * d_2)
 
-        #obtus_mask = (cos_a > 0) * 1
+        # obtus_mask = (cos_a > 0) * 1
         angles = np.arccos(cos_a)
 
         weight_angle = 3.142 - angles
@@ -1128,11 +1138,12 @@ class Optimizer:
                 first_index += length
 
             transformed_gen = np.array(transformed_gen, dtype="object")
-            obj_classes, obj_centres = self.builder(transformed_gen, self.windows, self.main_points, 150)
+            obj_classes, obj_centres, obj_all_centress = self.builder(transformed_gen, self.windows, self.main_points,
+                                                                      self.max_diagonal)
 
             # delete later
-            #mat_dist = self.get_minimal_dist_mat()
-            #object_distant_value, result_broken_gen, dist_value, sep_val_dist = self.distant_between_classes(
+            # mat_dist = self.get_minimal_dist_mat()
+            # object_distant_value, result_broken_gen, dist_value, sep_val_dist = self.distant_between_classes(
             #    obj_classes, mat_dist)
             # print('Distance', object_distant_value)
             # mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
@@ -1143,7 +1154,9 @@ class Optimizer:
 
             colors = ['red', 'blue', 'yellow', 'black', 'green']
             colors = colors[:transformed_gen.shape[0]]
-            for rect_class, color in zip(obj_classes, colors):
+
+            for rect_class, centres_class, color in zip(obj_classes, obj_all_centress, colors):
+                # axs[0].scatter(centres_class[:, 0], centres_class[:, 1], s=0.2, color=color)
                 for rect in rect_class:
                     x_list = np.append(rect[:, 0], rect[0, 0])
                     y_list = np.append(rect[:, 1], rect[0, 1])
@@ -1166,7 +1179,7 @@ class Optimizer:
 
             img = images[0]
             img.save(fp=fp_out, format="GIF", append_images=images[1:], save_all=True,
-                     duration=100, #int(gif_time / gens.shape[0]),
+                     duration=100,  # int(gif_time / gens.shape[0]),
                      loop=0)
 
     def save_dynasties(self, values, filename="Dynasties_values"):
@@ -1185,7 +1198,7 @@ class Optimizer:
         try:
             with open(filename, "a") as file_values:
                 file_values.write('\n')
-                for obj_class in gen: #[0]:
+                for obj_class in gen:  # [0]:
                     for item in obj_class:
                         file_values.write("%s\t" % item)
 
