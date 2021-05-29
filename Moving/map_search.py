@@ -46,6 +46,7 @@ class MapSearch:
         self.dynasties_best_values = []
         #self.best_gen = None
         self.class_index = 0
+        self.current_index = 0
         self.optional_args = None
 
         # creating the global process pool to be used across all generations
@@ -55,6 +56,9 @@ class MapSearch:
 
     def set_class_for_opt(self, class_index):
         self.class_index = class_index
+
+    def set_current_index(self, object_index):
+        self.current_index = object_index
 
     def set_gen_for_opt(self, gen):
         self.gen = gen
@@ -82,7 +86,9 @@ class MapSearch:
         res = values[0]
         res_sep = values[1]
 
-        worse_ind = np.argsort(res_sep[self.class_index] )[-1:] #!!!!!!!!!!!!!!!!!!!
+        #worse_ind = np.argsort(res_sep[self.class_index] )[-1:] #!!!!!!!!!!!!!!!!!!!
+
+        worse_ind = self.current_index
         other_indexes = self.function_get_other(self.best_gen, self.class_index, worse_ind)
 
         amount_other_indexes = other_indexes.shape[0]

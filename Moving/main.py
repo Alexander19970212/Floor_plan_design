@@ -61,7 +61,8 @@ class Optimizer:
         #  That part of code is used for testing object function without GA.
 
         gen = self.gen_constructor()
-        obj_classes, obj_centres, obj_all_centress = self.builder(gen, self.windows, self.main_points, self.max_diagonal)
+        obj_classes, obj_centres, obj_all_centress = self.builder(gen, self.windows, self.main_points,
+                                                                  self.max_diagonal)
         mat_dist = self.get_minimal_dist_mat()
         object_distant_value, result_broken_gen, obj_dist, sep_val_dist = self.distant_between_classes(obj_classes,
                                                                                                        mat_dist)
@@ -87,14 +88,14 @@ class Optimizer:
     def evol_optimization(self):
 
         evol_params = {
-            'num_processes': 8,  # (optional) number of processes for multiprocessing.Pool
-            'pop_size': 800,  # population size
+            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
+            'pop_size': 200,  # population size
             'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
             'calibration_function': self.calibration_function,
             'elitist_fraction': 2,  # fraction of population retained as is between generations
             'bounds': self.bounds,  # limits or list of variants, which variable can be
             'probability_mask': self.probability_mask,  # density of probability in bounds
-            'num_branches': 6  # Amount of dynasties
+            'num_branches': 4  # Amount of dynasties
         }
 
         es = EvolSearch(evol_params)  # Creating class for evolution search
@@ -108,7 +109,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 150  # Maximal amount of pops
+        max_num_gens = 2  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -171,10 +172,10 @@ class Optimizer:
 
     def map_optimization(self):
 
-        strategy_list = [0, 1, 2, 0, 1, 2, 0]
+        strategy_list = [0, 1]
 
         evol_params = {
-            'num_processes': 8,  # (optional) number of processes for multiprocessing.Pool
+            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
             'fitness_function': self.function_for_sep,  # custom function defined to evaluate fitness of a solution
             'first_gen': self.best_evol_individuals[0][0],
             'coefficients': self.coefficients,
@@ -192,22 +193,26 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 100  # Maximal amount of pops
+        max_num_gens = 5  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
 
         for cl_obj in strategy_list:
             es.set_class_for_opt(cl_obj)
-            num_gen = 0
+            num_gen = len(self.best_evol_individuals[0][0][cl_obj])
             #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
-            while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
-                print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
+            for object_index in range(0, num_gen):
+                # while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
+
+                print('Class #' + str(cl_obj) + ' ' + str(object_index) + '/' + str(num_gen) + ' Best Fitness = ' + str(
+                    es.get_best_individual_fitness()))
+                es.set_current_index(object_index)
                 self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
                 self.save_dynasties(es.get_dynasties_best_value(),
                                     'test_values.txt')  # saving the best fitness values for each dynasties
                 es.step_generation()  # Creating new population
-                num_gen += 1
+            # num_gen += 1
 
         # print results
         # print('Max fitness of population = ', es.get_best_individual_fitness())
@@ -1174,7 +1179,7 @@ class Optimizer:
             names = [f"Scrins/band{band}.jpg" for band in range(0, gens.shape[0], 2)]
             images = [Image.open(f) for f in names]
             images = [image.convert("P", palette=Image.ADAPTIVE) for image in images]
-            fp_out = "image3.gif"
+            fp_out = "image.gif"
             print('Creating GIF')
 
             img = images[0]
