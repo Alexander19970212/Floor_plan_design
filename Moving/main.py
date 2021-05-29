@@ -127,7 +127,7 @@ class Optimizer:
         # print('Max fitness of population = ', es.get_best_individual_fitness())
         # print('Best individual in population = ', es.get_best_individual())
         self.coefficients = es.get_coefficients()  # Getting found coefficients for recount getting plot result
-        self.best_evol_individuals = es.get_best_in_dynasties()
+        self.best_evol_individuals = es.get_best_individual()[0]
 
     def direct_optimization(self):
 
@@ -172,12 +172,12 @@ class Optimizer:
 
     def map_optimization(self):
 
-        strategy_list = [0, 1]
+        strategy_list = [1, 2]
 
         evol_params = {
             'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
             'fitness_function': self.function_for_sep,  # custom function defined to evaluate fitness of a solution
-            'first_gen': self.best_evol_individuals[0][0],
+            'first_gen': self.best_evol_individuals,
             'coefficients': self.coefficients,
             'function_get_oth_indexes': self.function_get_oth_indexes
         }
@@ -200,7 +200,7 @@ class Optimizer:
 
         for cl_obj in strategy_list:
             es.set_class_for_opt(cl_obj)
-            num_gen = len(self.best_evol_individuals[0][0][cl_obj])
+            num_gen = int((len(self.best_evol_individuals[cl_obj]) - 9)/2)
             #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
             for object_index in range(0, num_gen):
                 # while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
