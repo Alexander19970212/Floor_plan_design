@@ -80,21 +80,21 @@ class Optimizer:
         self.best_evol_individuals = np.array([])
 
         self.evol_optimization()
-        self.direct_optimization()
+        # self.direct_optimization()
         self.map_optimization()
         self.artist("test_gens.txt", 'test_values.txt', gen)  # Plot rendering and saving as GIF
 
     def evol_optimization(self):
 
         evol_params = {
-            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
-            'pop_size': 200,  # population size
+            'num_processes': 8,  # (optional) number of processes for multiprocessing.Pool
+            'pop_size': 800,  # population size
             'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
             'calibration_function': self.calibration_function,
             'elitist_fraction': 2,  # fraction of population retained as is between generations
             'bounds': self.bounds,  # limits or list of variants, which variable can be
             'probability_mask': self.probability_mask,  # density of probability in bounds
-            'num_branches': 4  # Amount of dynasties
+            'num_branches': 6  # Amount of dynasties
         }
 
         es = EvolSearch(evol_params)  # Creating class for evolution search
@@ -108,7 +108,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 5  # Maximal amount of pops
+        max_num_gens = 150  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -171,12 +171,12 @@ class Optimizer:
 
     def map_optimization(self):
 
-        strategy_list = [0, 1, 2, 1, 2, 0]
+        strategy_list = [0, 1, 2, 0, 1, 2, 0]
 
         evol_params = {
-            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
+            'num_processes': 8,  # (optional) number of processes for multiprocessing.Pool
             'fitness_function': self.function_for_sep,  # custom function defined to evaluate fitness of a solution
-            'first_gen': self.best_evol_individuals,
+            'first_gen': self.best_evol_individuals[0][0],
             'coefficients': self.coefficients,
             'function_get_oth_indexes': self.function_get_oth_indexes
         }
@@ -192,7 +192,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 5  # Maximal amount of pops
+        max_num_gens = 100  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -412,7 +412,7 @@ class Optimizer:
         """
 
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.4, 0.5, 0.1])  # influence penalty values to result
+        test_attention = np.array([0.45, 0.45, 0.1])  # influence penalty values to result
 
         try:
             # building floor plan which based on gen.
@@ -504,7 +504,7 @@ class Optimizer:
                 mask.append(np.ones_like(np.array(grid)))
 
         # This cod rows turn off directed evolution. That creates broken mask with only ones.
-        if result >= 0.42:
+        if result >= 0.6:
             mask = []
             for grid in gen:
                 mask.append(np.ones_like(np.array(grid)))
@@ -1174,7 +1174,7 @@ class Optimizer:
             names = [f"Scrins/band{band}.jpg" for band in range(0, gens.shape[0], 2)]
             images = [Image.open(f) for f in names]
             images = [image.convert("P", palette=Image.ADAPTIVE) for image in images]
-            fp_out = "image.gif"
+            fp_out = "image3.gif"
             print('Creating GIF')
 
             img = images[0]

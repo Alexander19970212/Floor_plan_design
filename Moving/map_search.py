@@ -131,7 +131,7 @@ class MapSearch:
         best_index = np.argsort(self.fitness_values * (-1))[-1:]
         self.best_gen = self.pop[best_index[0]]
 
-        self.dynasties_best_values = [1, 1, 1, 1]*self.fitness_values[best_index]  # extraction of mask for mutation
+        self.dynasties_best_values = [1, 1, 1, 1, 1, 1]*self.fitness_values[best_index]  # extraction of mask for mutation
 
 
         # self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
