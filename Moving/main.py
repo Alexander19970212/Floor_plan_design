@@ -358,6 +358,10 @@ class Optimizer:
         # building floor plan which based on gen.
         obj_classes, obj_centres, obj_all_centress = self.builder(gen, self.windows, self.main_points,
                                                                   self.max_diagonal)  # list rectangles
+
+        if obj_classes == False:
+            return False, False
+
         mat_dist = self.get_minimal_dist_mat()  # getting matrix of minimal distant between classes
 
         # getting distant sum between classes' rectangles, mask gen where distant less then allowed,
@@ -487,6 +491,8 @@ class Optimizer:
         """
         x_vector = np.array(x_vector, dtype="object")
         penalties, mask = self.test_function(x_vector)
+        if type(penalties) is bool:
+            return np.array([0, 0, 0])
         return penalties
 
     def fitness_function(self, gen, weights):
@@ -501,7 +507,13 @@ class Optimizer:
 
         try:
             penalties, mask = self.test_function(x_vector)  # getting list penalty values and broken mask
-            result = np.sum(test_attention * penalties / weights)
+            if type(penalties) is bool:
+                result = 1
+                mask = []
+                for grid in gen:
+                    mask.append(np.ones_like(np.array(grid)))
+            else:
+                result = np.sum(test_attention * penalties / weights)
         except:  # if floor plan could be built by gen
             result = 1
             mask = []
@@ -823,8 +835,12 @@ class Optimizer:
 
             centre_points_pre = self.sorting_drops_bydistant(grid, main_point)  # Sorting by distant from main point
 
+            if (centre_points_pre.shape[0] < amount):
+                return False, False, False
+
             #  get cells for location according locations' indexes
             centre_points, other_indexes = self.get_centre_points_option_4(centre_points_pre, locations_indexes)
+
 
             # Get rotated rectangles according angles' list
             rectangles = self.get_objects_angle(amount, p_x, p_y, objects_angles)
@@ -1216,7 +1232,7 @@ class Optimizer:
 
 if __name__ == "__main__":
     Classes = {
-        'Workplace': {"Amount": 60, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
+        'Workplace': {"Amount": 400, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                       "Classes_for_distant": {"Machine_tool": 40, "Printers": 20}},
