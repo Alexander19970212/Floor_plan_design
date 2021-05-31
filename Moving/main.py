@@ -88,8 +88,8 @@ class Optimizer:
     def evol_optimization(self):
 
         evol_params = {
-            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
-            'pop_size': 200,  # population size
+            'num_processes': 8,  # (optional) number of processes for multiprocessing.Pool
+            'pop_size': 800,  # population size
             'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
             'calibration_function': self.calibration_function,
             'elitist_fraction': 2,  # fraction of population retained as is between generations
@@ -109,7 +109,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 2  # Maximal amount of pops
+        max_num_gens = 150  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -172,10 +172,10 @@ class Optimizer:
 
     def map_optimization(self):
 
-        strategy_list = [1, 2]
+        strategy_list = [1, 2, 0, 1, 2, 0]
 
         evol_params = {
-            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
+            'num_processes': 8,  # (optional) number of processes for multiprocessing.Pool
             'fitness_function': self.function_for_sep,  # custom function defined to evaluate fitness of a solution
             'first_gen': self.best_evol_individuals,
             'coefficients': self.coefficients,
@@ -1236,7 +1236,7 @@ if __name__ == "__main__":
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                       "Classes_for_distant": {"Machine_tool": 40, "Printers": 20}},
-        'Printers': {"Amount": 10, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
+        'Printers': {"Amount": 50, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
                      "Need_lighting": 9,
                      "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
                      "Classes_for_distant": {"Machine_tool": 50, "Workplace": 2}},
@@ -1249,7 +1249,7 @@ if __name__ == "__main__":
         #          "Classes_for_short_path": [None],
         #          "Classes_ignored_intersections": ["Workplace", "Printers", "Cabinets", "Machine_tool"],
         #          "Classes_for_distant": {None}},
-        'Machine_tool': {"Amount": 6, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
+        'Machine_tool': {"Amount": 60, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
                          "Need_lighting": 1,
                          "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                          "Classes_for_distant": {"Workplace": 40, "Printers": 50, "Cabinets": 5}}
