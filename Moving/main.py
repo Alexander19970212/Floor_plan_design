@@ -69,6 +69,8 @@ class Optimizer:
         self.light_object_function(obj_centres, self.windows_lines, self.light_coefficients, gen)
         self.constructor_broken_gen(result_broken_gen, gen)
 
+        self.master_slave_function(obj_centres)
+
         # gen = self.gen_constructor()
         # coefficients = self.calibration_function(gen)
         # new_gen = self.gen_constructor()
@@ -172,7 +174,8 @@ class Optimizer:
 
     def map_optimization(self):
 
-        strategy_list = [1, 2]
+        strategy_list = [1, 1]
+        function_starategy_list = np.array([[0, 0, 0, 1], [0, 0, 0, 1]])
 
         evol_params = {
             'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
@@ -198,9 +201,10 @@ class Optimizer:
 
         es.step_generation()  # Creating the first population
 
-        for cl_obj in strategy_list:
+        for cl_obj, cl_funtions_indexes in zip(strategy_list, function_starategy_list):
             es.set_class_for_opt(cl_obj)
-            num_gen = int((len(self.best_evol_individuals[cl_obj]) - 9)/2)
+            es.set_function_indexes(cl_funtions_indexes)
+            num_gen = int((len(self.best_evol_individuals[cl_obj]) - 9) / 2)
             #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
             for object_index in range(0, num_gen):
                 # while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
@@ -372,9 +376,10 @@ class Optimizer:
                                                                                          self.windows_lines,
                                                                                          self.light_coefficients, gen)
         # getting full broken mask
+        master_slave_sum, broken_gen_master_slave, sep_val_master_slave = self.master_slave_function(obj_centres)
         mask, amount_inters = self.constructor_broken_gen(result_broken_gen, gen)
 
-        return np.array([object_distant_value, dist_value, light_distance_sum]), broken_gen_light
+        return np.array([object_distant_value, dist_value, light_distance_sum, master_slave_sum]), broken_gen_light
 
     def function_get_oth_indexes(self, gen, class_ind, obj_ind):
         x_vector = np.array(gen, dtype="object")
@@ -413,7 +418,7 @@ class Optimizer:
         except:
             return [obj_ind]
 
-    def function_for_sep(self, gen, weights):
+    def function_for_sep(self, gen, weights, functions_indexes):
         """
         The function gets gen, builds individual, analyzes it and creates mask list with broken parts.
         :param gen: Numpy array - list of variables.
@@ -421,7 +426,7 @@ class Optimizer:
         """
 
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.45, 0.45, 0.1])  # influence penalty values to result
+        test_attention = np.array([0.35, 0.35, 0.1, 0.2])  # influence penalty values to result
 
         try:
             # building floor plan which based on gen.
@@ -439,9 +444,16 @@ class Optimizer:
                                                                                              self.light_coefficients,
                                                                                              gen)
 
+            master_slave_sum, broken_ge_master_slave, sep_val_master_slave = self.master_slave_function(obj_centres)
+
+            #print(master_slave_sum)
+
             vector_values = self.balancing_function([sep_val_dist, sep_val_light])
 
-            result = np.sum(test_attention * np.array([object_distant_value, dist_value, light_distance_sum]) / weights)
+            result = np.sum(test_attention * functions_indexes * np.array(
+                [object_distant_value, dist_value, light_distance_sum, master_slave_sum]) / weights)
+
+            #print(result)
 
             return [result, np.array(sep_val_light, dtype="object")]
 
@@ -492,7 +504,7 @@ class Optimizer:
         x_vector = np.array(x_vector, dtype="object")
         penalties, mask = self.test_function(x_vector)
         if type(penalties) is bool:
-            return np.array([0, 0, 0])
+            return np.array([0, 0, 0, 0])
         return penalties
 
     def fitness_function(self, gen, weights):
@@ -503,7 +515,7 @@ class Optimizer:
         :return: float (0-1) - fitness values, numpy array - broken mask
         """
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.45, 0.45, 0.1])  # influence penalty values to result
+        test_attention = np.array([0.35, 0.35, 0.1, 0.2])  # influence penalty values to result
 
         try:
             penalties, mask = self.test_function(x_vector)  # getting list penalty values and broken mask
@@ -841,7 +853,6 @@ class Optimizer:
             #  get cells for location according locations' indexes
             centre_points, other_indexes = self.get_centre_points_option_4(centre_points_pre, locations_indexes)
 
-
             # Get rotated rectangles according angles' list
             rectangles = self.get_objects_angle(amount, p_x, p_y, objects_angles)
 
@@ -972,6 +983,46 @@ class Optimizer:
         light_distance_sum = np.sum(np.array(light_distance) * light_coefficients)
 
         return light_distance_sum, broken_gen, sep_val_gen
+
+    def master_slave_for_class(self, slave, master):
+
+        best_amount_daughter = int(master.shape[0] / slave.shape[0])
+        distances = self.distant_between_two_classes(slave[:, np.newaxis, :], master[:, np.newaxis, :])
+        distances = np.squeeze(distances, axis=2)
+        min_distances = np.repeat([np.amin(distances, axis=1)], slave.shape[0], axis=0).T
+        binar_min_dist = (distances == min_distances) * 1
+        sum_for_printers = np.sum(binar_min_dist, axis=0)
+        values_for_class = np.absolute(sum_for_printers - best_amount_daughter)
+
+        return values_for_class
+
+    def master_slave_function(self, classes_centre_points):
+        sep_val_gen = []
+        broken_gen = []
+        sum_penalty = 0
+        keys = list(self.Classes.keys())
+
+        for class_obj, class_rects in zip(self.Classes, classes_centre_points):
+            if "Master" not in self.Classes[class_obj]:
+                sep_val_gen.append(np.zeros(class_rects.shape[0]))
+                broken_gen.append(np.zeros(class_rects.shape[0]))
+            else:
+                master = self.Classes[class_obj]["Master"][0]
+                master_index = keys.index(master)
+                values_for_class = self.master_slave_for_class(class_rects, classes_centre_points[master_index])
+                sep_val_gen.append(values_for_class)
+
+                max_val = np.amax(values_for_class)
+                broken_gen.append((values_for_class > 0.75 * max_val) * 1)
+
+                sum_penalty += np.sum(values_for_class)
+
+        broken_gen = np.array(broken_gen, dtype='object')
+        sep_val_gen = np.array(sep_val_gen, dtype='object')
+
+        #print(sep_val_gen)
+
+        return sum_penalty, broken_gen, sep_val_gen
 
     def get_brokengen_light(self, parts_gen, example_gen):
         """
@@ -1232,13 +1283,13 @@ class Optimizer:
 
 if __name__ == "__main__":
     Classes = {
-        'Workplace': {"Amount": 400, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
+        'Workplace': {"Amount": 60, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                       "Classes_for_distant": {"Machine_tool": 40, "Printers": 20}},
-        'Printers': {"Amount": 10, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
+        'Printers': {"Amount": 4, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
                      "Need_lighting": 9,
-                     "Classes_for_short_path": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
+                     "Master": ["Workplace"], "Classes_ignored_intersections": ["lamp"],
                      "Classes_for_distant": {"Machine_tool": 50, "Workplace": 2}},
         # 'Cabinets': {"Amount": 4, "rectangular_x": 0.5, "rectangular_y": 2, 'Environment_x': 1.5, "Environment_y": 1,
         #              "Need_lighting": 6,

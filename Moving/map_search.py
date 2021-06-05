@@ -37,6 +37,7 @@ class MapSearch:
         self.function_get_other = evol_params['function_get_oth_indexes']
         self.best_gen = evol_params['first_gen']
         self.coefficients = evol_params['coefficients']
+        self.function_indexes = 1
 
         #self.pop = np.squeeze(self.first_pop.copy())
         #self.pop_old = np.squeeze(self.first_pop.copy())
@@ -53,6 +54,9 @@ class MapSearch:
         global __evolsearch_process_pool
         __evolsearch_process_pool = ProcessPool(self.num_processes)
         time.sleep(0.5)
+
+    def set_function_indexes(self, function_indexes):
+        self.function_indexes = function_indexes
 
     def set_class_for_opt(self, class_index):
         self.class_index = class_index
@@ -75,14 +79,14 @@ class MapSearch:
             else:
                 return self.fitness_function(self.pop[individual_index, :], self.optional_args[individual_index])
         else:
-            return self.fitness_function(self.pop[individual_index, :], self.coefficients)
+            return self.fitness_function(self.pop[individual_index, :], self.coefficients, self.function_indexes)
 
     def step_generation(self):
         """
         evaluate fitness of pop, and create new pop after crossing and mutation
         """
         # create initial data of evolutionary search
-        values = self.fitness_function(self.best_gen, self.coefficients)
+        values = self.fitness_function(self.best_gen, self.coefficients, self.function_indexes)
         res = values[0]
         res_sep = values[1]
 
@@ -137,7 +141,7 @@ class MapSearch:
         best_index = np.argsort(self.fitness_values * (-1))[-1:]
         self.best_gen = self.pop[best_index[0]]
 
-        self.dynasties_best_values = [1, 1, 1, 1, 1, 1]*self.fitness_values[best_index]  # extraction of mask for mutation
+        self.dynasties_best_values = [1, 1, 1, 1]*self.fitness_values[best_index]  # extraction of mask for mutation
 
 
         # self.dynasties_best_values = np.sum(self.fitness_old, axis=1)
