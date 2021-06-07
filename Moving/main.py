@@ -991,10 +991,15 @@ class Optimizer:
         distances = np.squeeze(distances, axis=2)
         min_distances = np.repeat([np.amin(distances, axis=1)], slave.shape[0], axis=0).T
         binar_min_dist = (distances == min_distances) * 1
+        # anti_binar_min_dis = (binar_min_dist - 1) * (-1)
+        distances_for_print_faml = distances * binar_min_dist
+        sum_dist_for_printers = np.sum(distances_for_print_faml, axis=0)
         sum_for_printers = np.sum(binar_min_dist, axis=0)
         values_for_class = np.absolute(sum_for_printers - best_amount_daughter)
 
-        return values_for_class
+        result = sum_dist_for_printers * (1 + 0.25*values_for_class)
+
+        return result
 
     def master_slave_function(self, classes_centre_points):
         sep_val_gen = []
