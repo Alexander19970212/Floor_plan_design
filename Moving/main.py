@@ -416,7 +416,7 @@ class Optimizer:
                                                  int(n_y), p_x, off2_y, grid_angle)
 
             # Remove points which are outside counter.
-            grid = self.cut_by_some_rectangles(previous_grid, self.windows)
+            grid = self.cut_by_some_rectangles(previous_grid, self.windows, p_x, p_y)
 
             centre_points = self.sorting_drops_bydistant(grid, main_point)  # Sorting by distant from main point
 
@@ -618,7 +618,7 @@ class Optimizer:
 
         return grid
 
-    def cut_by_some_rectangles(self, grid, rectangles):
+    def cut_by_some_rectangles(self, grid, rectangles, p_x, p_y):
         """
         The function returns points, which only in rectangles.
         :param grid: numpy array - coords(x, y) of all points
@@ -631,10 +631,10 @@ class Optimizer:
         for rectangle in rectangles:
 
             # get corners' coords (for the case if corners were not rowed).
-            up_coords = max(rectangle[:, 1])
-            down_coords = min(rectangle[:, 1])
-            left_coords = min(rectangle[:, 0])
-            right_coords = max(rectangle[:, 0])
+            up_coords = max(rectangle[:, 1]) - p_y/2
+            down_coords = min(rectangle[:, 1]) + p_y/2
+            left_coords = min(rectangle[:, 0]) + p_x/2
+            right_coords = max(rectangle[:, 0]) - p_x/2
 
             #  for the first points or if result list is empty.
             if result.size == 0:
@@ -852,7 +852,7 @@ class Optimizer:
                                                  int(n_y), p_x, off2_y, grid_angle)
 
             # Remove points which are outside counter.
-            grid = self.cut_by_some_rectangles(previous_grid, windows)
+            grid = self.cut_by_some_rectangles(previous_grid, windows, p_x, p_y)
 
             centre_points_pre = self.sorting_drops_bydistant(grid, main_point)  # Sorting by distant from main point
 
