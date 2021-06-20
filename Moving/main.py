@@ -52,7 +52,7 @@ class Optimizer:
         # self.windows = np.array(
         #     [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
         #      [[100, 75], [165, 45]]])
-        lines_index = [3, 4, 5]
+        lines_index = [0, 3, 4, 5]
         self.windows = np.array([[(7, 15), (7, 22), (20, 22), (20, 15)], [(4, 8), (4, 18), (12, 18), (12, 8)],
                                  [(7, 4), (7, 11), (20, 11), (20, 4)]]) * 10
 
@@ -87,9 +87,9 @@ class Optimizer:
         self.coefficients = np.array([])
         self.best_evol_individuals = np.array([])
 
-        #self.evol_optimization()
+        self.evol_optimization()
         # self.direct_optimization()
-        #self.map_optimization()
+        self.map_optimization()
         self.artist("test_gens.txt", 'test_values.txt', gen)  # Plot rendering and saving as GIF
 
     def evol_optimization(self):
@@ -116,7 +116,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 50  # Maximal amount of pops
+        max_num_gens = 100  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -179,13 +179,21 @@ class Optimizer:
 
     def map_optimization(self):
 
-        strategy_list = [2, 0, 2, 1, 1, 0, 2, 0, 2]
+        strategy_list = [0, 2, 4, 6, 11, 12, 8, 9, 10, 1, 3, 5, 7, 0, 2, 4, 6]
         function_starategy_list = np.array([[1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
                                             [1, 1, 1, 1],
                                             [0, 0, 0, 1],
                                             [0, 0, 0, 1],
                                             [0, 0, 0, 1],
-                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 1],
+                                            [1, 1, 1, 1],
                                             [1, 1, 1, 1],
                                             [1, 0, 1, 0],
                                             [1, 1, 1, 1],
@@ -1427,12 +1435,12 @@ if __name__ == "__main__":
 
     Opt = Optimizer(Classes)
 
-{"Machine_tool_1", "Machine_tool_2", "Professor_3",
- "Professor_2", "Professor_1", "Printers_adm",
- "Administration", "Printers_eng", "Engineers",
- "Printers_as", "Aspirants", "Printers_st", "Students"}
+# {"Machine_tool_1", "Machine_tool_2", "Professor_3",
+ # "Professor_2", "Professor_1", "Printers_adm",
+ # "Administration", "Printers_eng", "Engineers",
+# "Printers_as", "Aspirants", "Printers_st", "Students"}
 
-"Students", "Printers_st", "Aspirants", "Printers_as",
-"Engineers", "Printers_eng", "Administration", "Printers_adm",
-"Professor_2", "Professor_1", "Professor_3",
-"Machine_tool_1", "Machine_tool_2"
+# "Students", "Printers_st", "Aspirants", "Printers_as",
+# "Engineers", "Printers_eng", "Administration", "Printers_adm",
+# "Professor_2", "Professor_1", "Professor_3",
+# "Machine_tool_1", "Machine_tool_2"
