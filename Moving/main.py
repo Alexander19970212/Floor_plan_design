@@ -179,24 +179,32 @@ class Optimizer:
 
     def map_optimization(self):
 
-        strategy_list = [0, 2, 4, 6, 11, 12, 8, 9, 10, 1, 3, 5, 7, 0, 2, 4, 6]
-        function_starategy_list = np.array([[1, 1, 1, 1],
-                                            [1, 1, 1, 1],
-                                            [1, 1, 1, 1],
-                                            [1, 1, 1, 1],
-                                            [1, 1, 1, 1],
-                                            [1, 1, 1, 1],
-                                            [1, 1, 1, 1],
-                                            [1, 1, 1, 1],
-                                            [1, 1, 1, 1],
-                                            [0, 0, 0, 1],
-                                            [0, 0, 0, 1],
-                                            [0, 0, 0, 1],
+        strategy_list = [0, 2, 4, 6, 11, 12, 8, 9, 10, 1, 3, 5, 7, 0, 2, 4, 6, 11, 12, 11, 12, 11, 12, 11, 12]
+        function_starategy_list = np.array([[1, 0, 1, 1],
+                                            [1, 0, 1, 1],
+                                            [1, 0, 1, 1],
+                                            [1, 0, 1, 1],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 1, 1],
+                                            [1, 0, 1, 1],
+                                            [1, 0, 1, 1],
                                             [1, 0, 0, 1],
-                                            [1, 1, 1, 1],
-                                            [1, 1, 1, 1],
-                                            [1, 0, 1, 0],
-                                            [1, 1, 1, 1],
+                                            [1, 0, 0, 1],
+                                            [1, 0, 0, 1],
+                                            [1, 0, 0, 1],
+                                            [1, 0, 1, 1],
+                                            [1, 0, 1, 1],
+                                            [1, 0, 1, 1],
+                                            [1, 0, 1, 1],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 0],
                                             ])
 
         evol_params = {
@@ -1422,7 +1430,7 @@ if __name__ == "__main__":
                              "Students": 40, "Printers_st": 40, "Aspirants": 30, "Printers_as": 30,
                             "Engineers": 15, "Printers_eng": 15, "Administration": 40, "Printers_adm": 40,
                             "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
-                            "Machine_tool_2": 25}, "Color": "cornflowerblue"},
+                            "Machine_tool_2": 30}, "Color": "cornflowerblue"},
         'Machine_tool_2': {"Amount": 30, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
                          "Need_lighting": 1,
                          "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
@@ -1430,7 +1438,7 @@ if __name__ == "__main__":
                              "Students": 40, "Printers_st": 40, "Aspirants": 30, "Printers_as": 30,
                             "Engineers": 15, "Printers_eng": 15, "Administration": 40, "Printers_adm": 40,
                             "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
-                            "Machine_tool_1": 25}, "Color": "mediumblue"}
+                            "Machine_tool_1": 30}, "Color": "mediumblue"}
     }
 
     Opt = Optimizer(Classes)
