@@ -95,8 +95,8 @@ class Optimizer:
     def evol_optimization(self):
 
         evol_params = {
-            'num_processes': 16,  # (optional) number of processes for multiprocessing.Pool
-            'pop_size': 800,  # population size
+            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
+            'pop_size': 60,  # population size
             'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
             'calibration_function': self.calibration_function,
             'elitist_fraction': 2,  # fraction of population retained as is between generations
@@ -116,7 +116,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 100  # Maximal amount of pops
+        max_num_gens = 2  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         es.step_generation()  # Creating the first population
@@ -442,11 +442,12 @@ class Optimizer:
             centre_points = self.sorting_drops_bydistant(grid, main_point)  # Sorting by distant from main point
 
             #  get cells for location according locations' indexes
-            centre_points, other_indexes = self.get_centre_points_option_4(centre_points, locations_indexes)
+            centre_points, other_indexes, corrective_indexes = self.get_centre_points_option_4(centre_points,
+                                                                                            locations_indexes)
 
-            return other_indexes
+            return other_indexes, corrective_indexes
         except:
-            return [obj_ind]
+            return [obj_ind], [obj_ind]
 
     def function_for_sep(self, gen, weights, functions_indexes):
         """
@@ -476,14 +477,14 @@ class Optimizer:
 
             master_slave_sum, broken_ge_master_slave, sep_val_master_slave = self.master_slave_function(obj_centres)
 
-            #print(master_slave_sum)
+            # print(master_slave_sum)
 
             vector_values = self.balancing_function([sep_val_dist, sep_val_light])
 
             result = np.sum(test_attention * functions_indexes * np.array(
                 [object_distant_value, dist_value, light_distance_sum, master_slave_sum]) / weights)
 
-            #print(result)
+            # print(result)
 
             return [result, np.array(sep_val_light, dtype="object")]
 
@@ -652,10 +653,10 @@ class Optimizer:
         for rectangle in rectangles:
 
             # get corners' coords (for the case if corners were not rowed).
-            up_coords = max(rectangle[:, 1]) - p_y/2
-            down_coords = min(rectangle[:, 1]) + p_y/2
-            left_coords = min(rectangle[:, 0]) + p_x/2
-            right_coords = max(rectangle[:, 0]) - p_x/2
+            up_coords = max(rectangle[:, 1]) - p_y / 2
+            down_coords = min(rectangle[:, 1]) + p_y / 2
+            left_coords = min(rectangle[:, 0]) + p_x / 2
+            right_coords = max(rectangle[:, 0]) - p_x / 2
 
             #  for the first points or if result list is empty.
             if result.size == 0:
@@ -794,8 +795,9 @@ class Optimizer:
             all_indexes.remove(founded_index)
 
         all_indexes = np.array(all_indexes) / drops.shape[0]
+        corrective_indexes = np.array(selected_indexes) / drops.shape[0]
 
-        return drops[selected_indexes], all_indexes
+        return drops[selected_indexes], all_indexes, corrective_indexes
 
     def locate_objects(self, rects, centre_points):
         """
@@ -881,8 +883,7 @@ class Optimizer:
                 return False, False, False
 
             #  get cells for location according locations' indexes
-            centre_points, other_indexes = self.get_centre_points_option_4(centre_points_pre, locations_indexes)
-
+            centre_points, other_indexes, corrective_indexes = self.get_centre_points_option_4(centre_points_pre, locations_indexes)
 
             # Get rotated rectangles according angles' list
             rectangles = self.get_objects_angle(amount, p_x, p_y, objects_angles)
@@ -1028,7 +1029,7 @@ class Optimizer:
         sum_for_printers = np.sum(binar_min_dist, axis=0)
         values_for_class = np.absolute(sum_for_printers - best_amount_daughter)
 
-        result = sum_dist_for_printers * (1 + 0.25*values_for_class)
+        result = sum_dist_for_printers * (1 + 0.25 * values_for_class)
 
         return result
 
@@ -1056,7 +1057,7 @@ class Optimizer:
         broken_gen = np.array(broken_gen, dtype='object')
         sep_val_gen = np.array(sep_val_gen, dtype='object')
 
-        #print(sep_val_gen)
+        # print(sep_val_gen)
 
         return sum_penalty, broken_gen, sep_val_gen
 
@@ -1323,96 +1324,97 @@ class Optimizer:
 if __name__ == "__main__":
     Classes = {
         'Students': {"Amount": 80, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
-                      "Need_lighting": 9,
-                      "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
-                      "Classes_for_distant":
+                     "Need_lighting": 9,
+                     "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
+                     "Classes_for_distant":
                          {"Printers_st": 6, "Aspirants": 25, "Printers_as": 25,
-                        "Engineers": 25, "Printers_eng": 25, "Administration": 25, "Printers_adm": 25,
-                        "Professor_2": 30, "Professor_1": 30, "Professor_3": 30,
-                        "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "goldenrod"},
+                          "Engineers": 25, "Printers_eng": 25, "Administration": 25, "Printers_adm": 25,
+                          "Professor_2": 30, "Professor_1": 30, "Professor_3": 30,
+                          "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "goldenrod"},
         'Printers_st': {"Amount": 8, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
-                     "Need_lighting": 7,
-                     "Master": ["Students"], "Classes_ignored_intersections": ["lamp"],
-                     "Classes_for_distant": {
-                         "Students": 6, "Aspirants": 25, "Printers_as": 25,
-                        "Engineers": 25, "Printers_eng": 25, "Administration": 25, "Printers_adm": 25,
-                        "Professor_2": 30, "Professor_1": 30, "Professor_3": 30,
-                        "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "crimson"},
+                        "Need_lighting": 7,
+                        "Master": ["Students"], "Classes_ignored_intersections": ["lamp"],
+                        "Classes_for_distant": {
+                            "Students": 6, "Aspirants": 25, "Printers_as": 25,
+                            "Engineers": 25, "Printers_eng": 25, "Administration": 25, "Printers_adm": 25,
+                            "Professor_2": 30, "Professor_1": 30, "Professor_3": 30,
+                            "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "crimson"},
         'Aspirants': {"Amount": 16, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                       "Classes_for_distant": {
                           "Students": 25, "Printers_st": 25, "Printers_as": 6,
-                        "Engineers": 25, "Printers_eng": 25, "Administration": 25, "Printers_adm": 25,
-                        "Professor_2": 20, "Professor_1": 20, "Professor_3": 20,
-                        "Machine_tool_1": 30, "Machine_tool_2": 30}, "Color": "brown"},
+                          "Engineers": 25, "Printers_eng": 25, "Administration": 25, "Printers_adm": 25,
+                          "Professor_2": 20, "Professor_1": 20, "Professor_3": 20,
+                          "Machine_tool_1": 30, "Machine_tool_2": 30}, "Color": "brown"},
         'Printers_as': {"Amount": 2, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
-                     "Need_lighting": 6,
-                     "Master": ["Aspirants"], "Classes_ignored_intersections": ["lamp"],
-                     "Classes_for_distant": {
-                         "Students": 25, "Printers_st": 25, "Aspirants": 6,
-                        "Engineers": 25, "Printers_eng": 25, "Administration": 25, "Printers_adm": 25,
-                        "Professor_2": 20, "Professor_1": 20, "Professor_3": 20,
-                        "Machine_tool_1": 30, "Machine_tool_2": 30}, "Color": "yellow"},
+                        "Need_lighting": 6,
+                        "Master": ["Aspirants"], "Classes_ignored_intersections": ["lamp"],
+                        "Classes_for_distant": {
+                            "Students": 25, "Printers_st": 25, "Aspirants": 6,
+                            "Engineers": 25, "Printers_eng": 25, "Administration": 25, "Printers_adm": 25,
+                            "Professor_2": 20, "Professor_1": 20, "Professor_3": 20,
+                            "Machine_tool_1": 30, "Machine_tool_2": 30}, "Color": "yellow"},
         'Engineers': {"Amount": 8, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
                       "Need_lighting": 9,
                       "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
                       "Classes_for_distant": {
                           "Students": 25, "Printers_st": 25, "Aspirants": 25, "Printers_as": 25,
-                        "Printers_eng": 6, "Administration": 25, "Printers_adm": 25,
-                        "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
-                        "Machine_tool_1": 15, "Machine_tool_2": 15}, "Color": "darkviolet"},
+                          "Printers_eng": 6, "Administration": 25, "Printers_adm": 25,
+                          "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
+                          "Machine_tool_1": 15, "Machine_tool_2": 15}, "Color": "darkviolet"},
         'Printers_eng': {"Amount": 1, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
-                        "Need_lighting": 6,
-                        "Master": ["Engineers"], "Classes_ignored_intersections": ["lamp"],
-                        "Classes_for_distant": {
-                            "Students": 25, "Printers_st": 25, "Aspirants": 25, "Printers_as": 25,
-                            "Engineers": 6, "Administration": 25, "Printers_adm": 25,
-                            "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
-                            "Machine_tool_1": 15, "Machine_tool_2": 15}, "Color": "tan"},
+                         "Need_lighting": 6,
+                         "Master": ["Engineers"], "Classes_ignored_intersections": ["lamp"],
+                         "Classes_for_distant": {
+                             "Students": 25, "Printers_st": 25, "Aspirants": 25, "Printers_as": 25,
+                             "Engineers": 6, "Administration": 25, "Printers_adm": 25,
+                             "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
+                             "Machine_tool_1": 15, "Machine_tool_2": 15}, "Color": "tan"},
         'Administration': {"Amount": 8, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
-                      "Need_lighting": 9,
-                      "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
-                      "Classes_for_distant": {
-                          "Students": 25, "Printers_st": 25, "Aspirants": 25, "Printers_as": 25,
-                            "Engineers": 25, "Printers_eng": 25, "Printers_adm": 6,
-                            "Professor_2": 25, "Professor_1": 25, "Professor_3": 25,
-                            "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "red"},
+                           "Need_lighting": 9,
+                           "Classes_for_short_path": ["Printers", "Cabinets"],
+                           "Classes_ignored_intersections": ["lamp"],
+                           "Classes_for_distant": {
+                               "Students": 25, "Printers_st": 25, "Aspirants": 25, "Printers_as": 25,
+                               "Engineers": 25, "Printers_eng": 25, "Printers_adm": 6,
+                               "Professor_2": 25, "Professor_1": 25, "Professor_3": 25,
+                               "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "red"},
         'Printers_adm': {"Amount": 1, "rectangular_x": 1, "rectangular_y": 1, 'Environment_x': 3, "Environment_y": 3,
-                        "Need_lighting": 6,
-                        "Master": ["Aspirants"], "Classes_ignored_intersections": ["lamp"],
-                        "Classes_for_distant": {
-                            "Students": 25, "Printers_st": 25, "Aspirants": 25, "Printers_as": 25,
-                            "Engineers": 25, "Printers_eng": 25, "Administration": 6,
-                            "Professor_2": 25, "Professor_1": 25, "Professor_3": 25,
-                            "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "orange"},
+                         "Need_lighting": 6,
+                         "Master": ["Aspirants"], "Classes_ignored_intersections": ["lamp"],
+                         "Classes_for_distant": {
+                             "Students": 25, "Printers_st": 25, "Aspirants": 25, "Printers_as": 25,
+                             "Engineers": 25, "Printers_eng": 25, "Administration": 6,
+                             "Professor_2": 25, "Professor_1": 25, "Professor_3": 25,
+                             "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "orange"},
         'Professor_1': {"Amount": 1, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
-                           "Need_lighting": 9,
-                           "Classes_for_short_path": ["Printers", "Cabinets"],
-                           "Classes_ignored_intersections": ["lamp"],
-                           "Classes_for_distant": {
-                               "Students": 30, "Printers_st": 30, "Aspirants": 20, "Printers_as": 20,
-                                "Engineers": 40, "Printers_eng": 40, "Administration": 25, "Printers_adm": 25,
-                                "Professor_2": 10, "Professor_3": 10,
-                                "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "lime"},
+                        "Need_lighting": 9,
+                        "Classes_for_short_path": ["Printers", "Cabinets"],
+                        "Classes_ignored_intersections": ["lamp"],
+                        "Classes_for_distant": {
+                            "Students": 30, "Printers_st": 30, "Aspirants": 20, "Printers_as": 20,
+                            "Engineers": 40, "Printers_eng": 40, "Administration": 25, "Printers_adm": 25,
+                            "Professor_2": 10, "Professor_3": 10,
+                            "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "lime"},
         'Professor_2': {"Amount": 1, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
-                           "Need_lighting": 9,
-                           "Classes_for_short_path": ["Printers", "Cabinets"],
-                           "Classes_ignored_intersections": ["lamp"],
-                           "Classes_for_distant": {
-                               "Students": 30, "Printers_st": 30, "Aspirants": 20, "Printers_as": 20,
-                                "Engineers": 40, "Printers_eng": 40, "Administration": 25, "Printers_adm": 25,
-                                "Professor_1": 10, "Professor_3": 10,
-                                "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "seagreen"},
+                        "Need_lighting": 9,
+                        "Classes_for_short_path": ["Printers", "Cabinets"],
+                        "Classes_ignored_intersections": ["lamp"],
+                        "Classes_for_distant": {
+                            "Students": 30, "Printers_st": 30, "Aspirants": 20, "Printers_as": 20,
+                            "Engineers": 40, "Printers_eng": 40, "Administration": 25, "Printers_adm": 25,
+                            "Professor_1": 10, "Professor_3": 10,
+                            "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "seagreen"},
         'Professor_3': {"Amount": 1, "rectangular_x": 2, "rectangular_y": 1, 'Environment_x': 4, "Environment_y": 3,
-                           "Need_lighting": 9,
-                           "Classes_for_short_path": ["Printers", "Cabinets"],
-                           "Classes_ignored_intersections": ["lamp"],
-                           "Classes_for_distant": {
-                               "Students": 30, "Printers_st": 30, "Aspirants": 20, "Printers_as": 20,
-                                "Engineers": 40, "Printers_eng": 40, "Administration": 25, "Printers_adm": 25,
-                                "Professor_2": 10, "Professor_1": 10,
-                                "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "green"},
+                        "Need_lighting": 9,
+                        "Classes_for_short_path": ["Printers", "Cabinets"],
+                        "Classes_ignored_intersections": ["lamp"],
+                        "Classes_for_distant": {
+                            "Students": 30, "Printers_st": 30, "Aspirants": 20, "Printers_as": 20,
+                            "Engineers": 40, "Printers_eng": 40, "Administration": 25, "Printers_adm": 25,
+                            "Professor_2": 10, "Professor_1": 10,
+                            "Machine_tool_1": 40, "Machine_tool_2": 40}, "Color": "green"},
 
         # 'Cabinets': {"Amount": 4, "rectangular_x": 0.5, "rectangular_y": 2, 'Environment_x': 1.5, "Environment_y": 1,
         #              "Need_lighting": 6,
@@ -1424,28 +1426,30 @@ if __name__ == "__main__":
         #          "Classes_ignored_intersections": ["Workplace", "Printers", "Cabinets", "Machine_tool"],
         #          "Classes_for_distant": {None}},
         'Machine_tool_1': {"Amount": 30, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
-                         "Need_lighting": 1,
-                         "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
-                         "Classes_for_distant": {
-                             "Students": 40, "Printers_st": 40, "Aspirants": 30, "Printers_as": 30,
-                            "Engineers": 15, "Printers_eng": 15, "Administration": 40, "Printers_adm": 40,
-                            "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
-                            "Machine_tool_2": 30}, "Color": "cornflowerblue"},
+                           "Need_lighting": 1,
+                           "Classes_for_short_path": ["Printers", "Cabinets"],
+                           "Classes_ignored_intersections": ["lamp"],
+                           "Classes_for_distant": {
+                               "Students": 40, "Printers_st": 40, "Aspirants": 30, "Printers_as": 30,
+                               "Engineers": 15, "Printers_eng": 15, "Administration": 40, "Printers_adm": 40,
+                               "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
+                               "Machine_tool_2": 30}, "Color": "cornflowerblue"},
         'Machine_tool_2': {"Amount": 30, "rectangular_x": 3, "rectangular_y": 4, 'Environment_x': 8, "Environment_y": 8,
-                         "Need_lighting": 1,
-                         "Classes_for_short_path": ["Printers", "Cabinets"], "Classes_ignored_intersections": ["lamp"],
-                         "Classes_for_distant": {
-                             "Students": 40, "Printers_st": 40, "Aspirants": 30, "Printers_as": 30,
-                            "Engineers": 15, "Printers_eng": 15, "Administration": 40, "Printers_adm": 40,
-                            "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
-                            "Machine_tool_1": 30}, "Color": "mediumblue"}
+                           "Need_lighting": 1,
+                           "Classes_for_short_path": ["Printers", "Cabinets"],
+                           "Classes_ignored_intersections": ["lamp"],
+                           "Classes_for_distant": {
+                               "Students": 40, "Printers_st": 40, "Aspirants": 30, "Printers_as": 30,
+                               "Engineers": 15, "Printers_eng": 15, "Administration": 40, "Printers_adm": 40,
+                               "Professor_2": 40, "Professor_1": 40, "Professor_3": 40,
+                               "Machine_tool_1": 30}, "Color": "mediumblue"}
     }
 
     Opt = Optimizer(Classes)
 
 # {"Machine_tool_1", "Machine_tool_2", "Professor_3",
- # "Professor_2", "Professor_1", "Printers_adm",
- # "Administration", "Printers_eng", "Engineers",
+# "Professor_2", "Professor_1", "Printers_adm",
+# "Administration", "Printers_eng", "Engineers",
 # "Printers_as", "Aspirants", "Printers_st", "Students"}
 
 # "Students", "Printers_st", "Aspirants", "Printers_as",

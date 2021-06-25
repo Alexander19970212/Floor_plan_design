@@ -93,10 +93,11 @@ class MapSearch:
         #worse_ind = np.argsort(res_sep[self.class_index] )[-1:] #!!!!!!!!!!!!!!!!!!!
 
         worse_ind = self.current_index
-        other_indexes = self.function_get_other(self.best_gen, self.class_index, worse_ind)
+        other_indexes, corrective_indexes = self.function_get_other(self.best_gen, self.class_index, worse_ind)
 
         amount_other_indexes = other_indexes.shape[0]
 
+        self.best_gen[self.class_index][9:corrective_indexes.shape[0]+9] = corrective_indexes
         best_gen = self.best_gen[np.newaxis, :]
         pop_bufer = np.repeat(best_gen, amount_other_indexes, axis=0)
 
