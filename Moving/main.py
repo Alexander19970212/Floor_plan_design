@@ -95,8 +95,8 @@ class Optimizer:
     def evol_optimization(self):
 
         evol_params = {
-            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
-            'pop_size': 60,  # population size
+            'num_processes': 16,  # (optional) number of processes for multiprocessing.Pool
+            'pop_size': 800,  # population size
             'fitness_function': self.fitness_function,  # custom function defined to evaluate fitness of a solution
             'calibration_function': self.calibration_function,
             'elitist_fraction': 2,  # fraction of population retained as is between generations
@@ -443,7 +443,7 @@ class Optimizer:
 
             #  get cells for location according locations' indexes
             centre_points, other_indexes, corrective_indexes = self.get_centre_points_option_4(centre_points,
-                                                                                            locations_indexes)
+                                                                                               locations_indexes)
 
             return other_indexes, corrective_indexes
         except:
@@ -883,7 +883,8 @@ class Optimizer:
                 return False, False, False
 
             #  get cells for location according locations' indexes
-            centre_points, other_indexes, corrective_indexes = self.get_centre_points_option_4(centre_points_pre, locations_indexes)
+            centre_points, other_indexes, corrective_indexes = self.get_centre_points_option_4(centre_points_pre,
+                                                                                               locations_indexes)
 
             # Get rotated rectangles according angles' list
             rectangles = self.get_objects_angle(amount, p_x, p_y, objects_angles)
@@ -986,7 +987,9 @@ class Optimizer:
 
         object_distant_value = 0  # additional sum of disturbances
         for chromosome_index in range(number_classes):
-            object_distant_value += np.sum(result_broken_gen[chromosome_index])
+            object_distant_value += np.sum(sep_val_gen[chromosome_index])
+
+            # object_distant_value += np.sum(result_broken_gen[chromosome_index])
             # transform broken mask as part of chromosome
             result_broken_gen[chromosome_index] = (result_broken_gen[chromosome_index] >= 1) * 1
 
