@@ -179,20 +179,22 @@ class Optimizer:
 
     def map_optimization(self):
 
-        strategy_list = [0, 2, 4, 6, 11, 12, 8, 9, 10, 1, 3, 5, 7, 0, 2, 4, 6, 11, 12, 11, 12, 11, 12, 11, 12]
-        function_starategy_list = np.array([[1, 0, 1, 1],
-                                            [1, 0, 1, 1],
-                                            [1, 0, 1, 1],
-                                            [1, 0, 1, 1],
+        strategy_list = [0, 2, 4, 6, 11, 12, 11, 12, 8, 9, 10, 1, 3, 5, 7, 0, 2, 4, 6, 11, 12, 11, 12, 11, 12, 11, 12]
+        function_starategy_list = np.array([[0, 0, 1, 0],
+                                            [0, 0, 1, 0],
+                                            [0, 0, 1, 0],
+                                            [0, 0, 1, 0],
+                                            [1, 0, 0, 0],
+                                            [1, 0, 0, 0],
                                             [1, 0, 0, 0],
                                             [1, 0, 0, 0],
                                             [1, 0, 1, 1],
                                             [1, 0, 1, 1],
                                             [1, 0, 1, 1],
-                                            [1, 0, 0, 1],
-                                            [1, 0, 0, 1],
-                                            [1, 0, 0, 1],
-                                            [1, 0, 0, 1],
+                                            [0, 0, 0, 1],
+                                            [0, 0, 0, 1],
+                                            [0, 0, 0, 1],
+                                            [0, 0, 0, 1],
                                             [1, 0, 1, 1],
                                             [1, 0, 1, 1],
                                             [1, 0, 1, 1],
@@ -945,6 +947,7 @@ class Optimizer:
         number_classes = rects_classes.shape[0]
         broken_gens = []
         sep_val_gen = []
+        comp_matrix = np.zeros([number_classes, number_classes])
 
         if flag_debug:
             print(minimal_distances)
@@ -960,14 +963,17 @@ class Optimizer:
 
                     # find position where distances are exceeded
                     distances_mistake = (distances < minimal_distances[i, j]) * 1
-                    mistake_value = (minimal_distances[i, j] - distances) * distances_mistake
+                    mistake_value = np.absolute(minimal_distances[i, j] - distances) * distances_mistake
                     mistake_value = np.sum(mistake_value, axis=2)
                     mistake_value = np.sum(mistake_value, axis=0)
                     sep_val_chr.append(mistake_value)
 
                     # Sum disturbances
-                    distances_mistake = np.sum(distances_mistake, axis=2)
-                    distances_mistake = np.sum(distances_mistake, axis=0)
+                    #distances_mistake = np.sum(distances_mistake, axis=2)
+                    #distances_mistake = np.sum(distances_mistake, axis=0)
+
+                    comp_matrix[i, j] = np.sum(distances)
+                    comp_matrix[i, j] = np.sum(distances)
 
                     # Save for couple
                     broken_gen.append(distances_mistake)
