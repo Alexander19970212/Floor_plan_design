@@ -139,7 +139,7 @@ class Optimizer:
     def direct_optimization(self):
 
         evol_params = {
-            'num_processes': 4,  # (optional) number of processes for multiprocessing.Pool
+            'num_processes': 16,  # (optional) number of processes for multiprocessing.Pool
             'fitness_function': self.function_for_sep,  # custom function defined to evaluate fitness of a solution
             'bounds': self.bounds,  # limits or list of variants, which variable can be
             'probability_mask': self.probability_mask,  # density of probability in bounds
@@ -969,11 +969,11 @@ class Optimizer:
                     sep_val_chr.append(mistake_value)
 
                     # Sum disturbances
-                    #distances_mistake = np.sum(distances_mistake, axis=2)
-                    #distances_mistake = np.sum(distances_mistake, axis=0)
+                    distances_mistake = np.sum(distances_mistake, axis=2)
+                    distances_mistake = np.sum(distances_mistake, axis=0)
 
-                    comp_matrix[i, j] = np.sum(distances)
-                    comp_matrix[i, j] = np.sum(distances)
+                    #comp_matrix[i, j] = np.sum(distances)
+                    #comp_matrix[i, j] = np.sum(distances)
 
                     # Save for couple
                     broken_gen.append(distances_mistake)
