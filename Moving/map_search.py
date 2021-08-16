@@ -46,9 +46,11 @@ class MapSearch:
         self.num_processes = evol_params.get('num_processes', None)
         self.dynasties_best_values = []
         #self.best_gen = None
+        self.sep_fitness = []
         self.class_index = 0
         self.current_index = 0
         self.optional_args = None
+        self.best_sep_values = None
 
         # creating the global process pool to be used across all generations
         global __evolsearch_process_pool
@@ -132,6 +134,7 @@ class MapSearch:
         self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
 
         self.fitness_values = self.fitness[:, 0]  # extraction of mask for mutation
+        self.sep_fitness = self.fitness[:, 2]
         self.fitness = self.fitness[:, 1]  # remaining values are fitness values list
 
         list_values_by_place = []
@@ -141,6 +144,7 @@ class MapSearch:
 
         best_index = np.argsort(self.fitness_values * (-1))[-1:]
         self.best_gen = self.pop[best_index[0]]
+        self.best_sep_values = self.sep_fitness[best_index[0]]
 
         self.dynasties_best_values = [1, 1, 1, 1, 1, 1]*self.fitness_values[best_index]  # extraction of mask for mutation
 
@@ -164,11 +168,24 @@ class MapSearch:
         '''
         return np.min(self.dynasties_best_values)
 
+    def get_best_sep_values(self):
+        return self.best_sep_values
+
     def get_mean_fitness(self):
         '''
         returns the mean fitness of the population
         '''
         return np.mean(self.dynasties_best_values)
+
+    def get_sorted_objects(self):
+
+        values = self.fitness_function(self.best_gen, self.coefficients, self.function_indexes)
+        res = values[0]
+        res_sep = values[1]
+
+        worse_ind = np.argsort(res_sep[self.class_index])
+
+        return worse_ind
 
 
 if __name__ == "__main__":

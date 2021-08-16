@@ -1,6 +1,8 @@
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.gridspec import GridSpec
 from evolutionary_search import EvolSearch
 from derected_search import DirSearch
 from map_search import MapSearch
@@ -46,15 +48,28 @@ class Optimizer:
         self.probability_mask_constructor()
         gen = self.gen_constructor()
 
+        self.obj_function_names = ["MinD", "Compact", "Illum", "MtL"]
+        self.optimization_algorithms = ["Evolutionary_algorithm", "Direct_optimization", "Map_optimization"]
         #  that parameters are used for definition case plan. Windows are ares for classes where it could be.
         #  Main_points are points for each class. That points point are used for sorting cells of grid by distant.
         #  In further these parameters should be obtain by other class.
         # self.windows = np.array(
         #     [[[5, 100], [100, 5]], [[5, 100], [100, 5]], [[5, 100], [100, 5]], [[100, 40], [165, 5]],
         #      [[100, 75], [165, 45]]])
-        lines_index = [0, 3, 4, 5]
-        self.windows = np.array([[(7, 15), (7, 22), (20, 22), (20, 15)], [(4, 8), (4, 18), (12, 18), (12, 8)],
-                                 [(7, 4), (7, 11), (20, 11), (20, 4)]]) * 10
+        # lines_index = [0, 2, 3, 5, 7, 8, 10, 12, 13, 15, 17, 18]
+        lines_index = [5, 7, 9]
+        # self.windows = np.array([[(7, 15), (7, 22), (20, 22), (20, 15)], [(4, 8), (4, 18), (12, 18), (12, 8)],
+        #                          [(7, 4), (7, 11), (20, 11), (20, 4)]]) * 10
+        #
+        # self.windows = np.array([[(0, 100), (0, 150), (250, 150), (250, 100)],
+        #                          [(100, 0), (100, 250), (150, 250), (150, 0)],
+        #                          [(70, 70), (70, 180), (180, 180), (180, 70)]])
+
+        self.windows = np.array([[(0, 0), (0, 10), (9, 10), (9, 0)],
+                                 [(8, 3), (8, 22), (15, 22), (15, 3)],
+                                 [(0, 15), (0, 25), (9, 25), (9, 15)],
+                                 [(14, 6), (14, 19), (25, 19), (25, 6)]
+                                 ]) * 10
 
         self.main_points = np.array([[5, 5], [45, 55], [95, 35], [165, 40], [135, 45],
                                      [5, 5], [45, 55], [95, 35], [165, 40], [135, 45],
@@ -91,6 +106,7 @@ class Optimizer:
         # self.direct_optimization()
         self.map_optimization()
         self.artist("test_gens.txt", 'test_values.txt', gen)  # Plot rendering and saving as GIF
+        print(self.coefficients)
 
     def evol_optimization(self):
 
@@ -116,19 +132,49 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 2  # Maximal amount of pops
+        max_num_gens = 300  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
+
+        repeat_counter = 0
+        previous_values = 1
+        mutation_coefficient = 0.1
 
         es.step_generation()  # Creating the first population
 
         #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
         while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
-            print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
+            best_ind = es.get_best_individual_fitness()
+
+            print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(best_ind))
             self.save_best_gen(es.get_best_individual()[0], "test_gens.txt")  # saving the best individual
-            self.save_dynasties(es.get_dynasties_best_value(),
-                                'test_values.txt')  # saving the best fitness values for each dynasties
+
+            best_sep_vals = es.get_best_sep_values()[0]
+
+            saving_values = [best_ind, 0]
+
+            saving_values.extend(best_sep_vals)
+
+            self.save_dynasties(saving_values, 'test_values.txt')
+
+            # self.save_dynasties(es.get_dynasties_best_value(),
+            #                    'test_values.txt')  # saving the best fitness values for each dynasties
+
+            if previous_values == best_ind:
+                repeat_counter += 1
+                if repeat_counter >= 10:
+                    mutation_coefficient *= 0.7
+                    es.set_mutation_coefficient(mutation_coefficient)
+                    repeat_counter = 0
+
+            if num_gen == 100:
+                es.set_direct_evolution(True)
+                mutation_coefficient = 0.1
+                es.set_mutation_coefficient(mutation_coefficient)
+                print("Direct_evol")
+
             es.step_generation()  # Creating new population
             num_gen += 1
+            previous_values = best_ind
 
         # print results
         # print('Max fitness of population = ', es.get_best_individual_fitness())
@@ -165,12 +211,16 @@ class Optimizer:
 
         #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
         while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
-            print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(es.get_best_individual_fitness()))
-            self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
+            best_ind = es.get_best_individual_fitness()
+            print('Gen #' + str(num_gen) + ' Best Fitness = ' + str(best_ind))
+            # self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
             self.save_dynasties(es.get_dynasties_best_value(),
                                 'test_values.txt')  # saving the best fitness values for each dynasties
             es.step_generation()  # Creating new population
             num_gen += 1
+
+            saving_values = [best_ind, 1]
+            self.save_dynasties(saving_values, 'test_values.txt')
 
             # print results
         # print('Max fitness of population = ', es.get_best_individual_fitness())
@@ -179,34 +229,51 @@ class Optimizer:
 
     def map_optimization(self):
 
-        strategy_list = [0, 2, 4, 6, 11, 12, 11, 12, 8, 9, 10, 1, 3, 5, 7, 0, 2, 4, 6, 11, 12, 11, 12, 11, 12, 11, 12]
-        function_starategy_list = np.array([[0, 0, 1, 0],
-                                            [0, 0, 1, 0],
-                                            [0, 0, 1, 0],
-                                            [0, 0, 1, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 1, 1],
-                                            [1, 0, 1, 1],
-                                            [1, 0, 1, 1],
-                                            [0, 0, 0, 1],
-                                            [0, 0, 0, 1],
-                                            [0, 0, 0, 1],
-                                            [0, 0, 0, 1],
-                                            [1, 0, 1, 1],
-                                            [1, 0, 1, 1],
-                                            [1, 0, 1, 1],
-                                            [1, 0, 1, 1],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
-                                            [1, 0, 0, 0],
+        strategy_list = [0, 2, 4, 6, 1, 3, 5, 7, 8, 9, 10, 11, 12]
+            # 0]  # , 2, 4, 6, 11, 12, 11, 12, 8, 9, 10, 1, 3, 5, 7, 0, 2, 4, 6, 11, 12, 11, 12, 11, 12, 11, 12]
+
+        # strategy_list = [2, 4, 6]
+        #
+        # function_starategy_list = np.array([[1, 0, 0, 0],
+        #                                     [1, 1, 1, 0],
+        #                                     [1, 1, 1, 1]])
+
+        function_starategy_list = np.array([[1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1],
+                                            [1, 1, 1, 1]
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 1, 1],
+                                            # [1, 0, 1, 1],
+                                            # [1, 0, 1, 1],
+                                            # [0, 0, 0, 1],
+                                            # [0, 0, 0, 1],
+                                            # [0, 0, 0, 1],
+                                            # [0, 0, 0, 1],
+                                            # [1, 0, 1, 1],
+                                            # [1, 0, 1, 1],
+                                            # [1, 0, 1, 1],
+                                            # [1, 0, 1, 1],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
+                                            # [1, 0, 0, 0],
                                             ])
 
         evol_params = {
@@ -237,16 +304,29 @@ class Optimizer:
             es.set_class_for_opt(cl_obj)
             es.set_function_indexes(cl_funtions_indexes)
             num_gen = int((len(self.best_evol_individuals[cl_obj]) - 9) / 2)
+
+            sorted_ind_list = (num_gen-1) - es.get_sorted_objects()
             #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
+            ############## for object_index in sorted_ind_list:
             for object_index in range(0, num_gen):
                 # while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
-
+                best_ind = es.get_best_individual_fitness()
                 print('Class #' + str(cl_obj) + ' ' + str(object_index) + '/' + str(num_gen) + ' Best Fitness = ' + str(
-                    es.get_best_individual_fitness()))
+                    best_ind))
                 es.set_current_index(object_index)
                 self.save_best_gen(es.get_best_individual(), "test_gens.txt")  # saving the best individual
-                self.save_dynasties(es.get_dynasties_best_value(),
-                                    'test_values.txt')  # saving the best fitness values for each dynasties
+
+                best_sep_values = es.get_best_sep_values()
+
+                saving_values = [best_ind, 2]
+                saving_values.extend(best_sep_values)
+                saving_values.append(cl_obj)
+                object_funct_ind = np.where(cl_funtions_indexes > 0)[0]
+                saving_values.extend(object_funct_ind)
+                self.save_dynasties(saving_values, 'test_values.txt')
+
+                # self.save_dynasties(es.get_dynasties_best_value(),
+                #                     'test_values.txt')  # saving the best fitness values for each dynasties
                 es.step_generation()  # Creating new population
             # num_gen += 1
 
@@ -483,15 +563,17 @@ class Optimizer:
 
             vector_values = self.balancing_function([sep_val_dist, sep_val_light])
 
-            result = np.sum(test_attention * functions_indexes * np.array(
-                [object_distant_value, dist_value, light_distance_sum, master_slave_sum]) / weights)
+            sep_result = test_attention * np.array(
+                [object_distant_value, dist_value, light_distance_sum, master_slave_sum]) / weights
+
+            result = np.sum(sep_result * functions_indexes)
 
             # print(result)
 
-            return [result, np.array(sep_val_light, dtype="object")]
+            return [result, np.array(sep_val_light, dtype="object"), sep_result]
 
         except:
-            return [1, False]
+            return [1, False, False]
 
     def balancing_function(self, sep_values):
 
@@ -540,7 +622,7 @@ class Optimizer:
             return np.array([0, 0, 0, 0])
         return penalties
 
-    def fitness_function(self, gen, weights):
+    def fitness_function(self, gen, weights, direct):
         """
         The function calculates fitness function as sum of penalty values multiplied by penalty weights.
         :param gen: numpy array - list variables
@@ -548,30 +630,32 @@ class Optimizer:
         :return: float (0-1) - fitness values, numpy array - broken mask
         """
         x_vector = np.array(gen, dtype="object")
-        test_attention = np.array([0.35, 0.35, 0.1, 0.2])  # influence penalty values to result
+        test_attention = np.array([0.25, 0.25, 0.25, 0.25])  # influence penalty values to result
 
         try:
             penalties, mask = self.test_function(x_vector)  # getting list penalty values and broken mask
             if type(penalties) is bool:
                 result = 1
+                sep_result = np.array([1, 1, 1, 1])
                 mask = []
                 for grid in gen:
                     mask.append(np.ones_like(np.array(grid)))
             else:
                 result = np.sum(test_attention * penalties / weights)
+                sep_result = test_attention * penalties / weights
         except:  # if floor plan could be built by gen
             result = 1
             mask = []
             for grid in gen:
                 mask.append(np.ones_like(np.array(grid)))
 
-        # This cod rows turn off directed evolution. That creates broken mask with only ones.
-        if result >= 0.6:
+            # This cod rows turn off directed evolution. That creates broken mask with only ones.
+        if not direct:
             mask = []
             for grid in gen:
                 mask.append(np.ones_like(np.array(grid)))
 
-        return [result, np.array(mask, dtype='object')]
+        return [result, np.array(mask, dtype='object'), sep_result]
 
     def get_cells_grids(self, main_point, offset_grid, max_rad, n_x, p_x, dist_x, n_y, p_y, dist_y, deg):
         """
@@ -972,8 +1056,8 @@ class Optimizer:
                     distances_mistake = np.sum(distances_mistake, axis=2)
                     distances_mistake = np.sum(distances_mistake, axis=0)
 
-                    #comp_matrix[i, j] = np.sum(distances)
-                    #comp_matrix[i, j] = np.sum(distances)
+                    # comp_matrix[i, j] = np.sum(distances)
+                    # comp_matrix[i, j] = np.sum(distances)
 
                     # Save for couple
                     broken_gen.append(distances_mistake)
@@ -1207,6 +1291,8 @@ class Optimizer:
         from shapely.ops import unary_union
         from shapely.geometry import Polygon, mapping
 
+        categories = [*self.obj_function_names, self.obj_function_names[0]]
+
         polygons = []
 
         for rectangle in self.windows:
@@ -1217,13 +1303,18 @@ class Optimizer:
         countur_coords = np.array(mapping(polygons)['coordinates'][0])
 
         dynasties_values = []
+        best_values = []
         with open(filename_values, "r") as file:
             for line in file:
                 dynasties_values.append(line.split())
+                if len(line.split()) > 0:
+                    best_values.append(line.split()[0])
 
         dynasties_values = dynasties_values[1:]
 
-        dynasties_values = np.float_(dynasties_values)
+        # best_values = dynasties_values[:, 0]
+        best_values = np.float_(best_values)
+        # dynasties_values = np.float_(dynasties_values)
 
         gens = []
         with open(filename_gens, "r") as file:
@@ -1234,20 +1325,78 @@ class Optimizer:
         gens = np.float_(gens)
         gens = np.array(gens)
 
+        handles = []
+        for object_class, object_color in zip(self.Classes, self.colors):
+            handles.append(mpatches.Patch(facecolor=object_color, label=object_class, linewidth=0.5, edgecolor='black'))
+
         for gen, values, i in zip(gens, dynasties_values, range(gens.shape[0])):
 
             print("Plot_number_", i)
-            fig, axs = plt.subplots(2)
-            axs[0].axis('equal')
-            axs[1].set_xlim(0, gens.shape[0])
-            axs[1].set_ylim(0.1, 0.91)
+            # fig, axs = plt.subplots(3, 1, figsize=(10, 9), gridspec_kw={'height_ratios': [6, 1, 1]})
+            # axs[0].axis('equal')
+            # axs[0].set_axis_off()
+            # axs[0].set_title(self.optimization_algorithms[int(values[1])], loc='left', pad=-14)
+
+            polar_values = np.array([*values[2:6], values[2]]).astype(np.float)
+
+            print(polar_values)
+
+            fig = plt.figure(figsize=(10, 9), constrained_layout=True)
+
+            gs = GridSpec(3, 2, figure=fig)
+            # ax_0 = fig.add_subplot(3, 2, 4)
+
+            ax_0 = fig.add_subplot(gs[0:2, :])
+            label_loc = np.linspace(start=0, stop=2 * np.pi, num=len(polar_values))
+
+            ax_1 = fig.add_subplot(gs[2, 0], projection='polar')
+
+            ax_1.plot(label_loc, polar_values, label='Current')
+
+            # if i != 0:
+            #     polar_values_previous = np.array([*dynasties_values[i - 1][2:6], dynasties_values[i - 1][2]]).astype(
+            #         np.float)
+            #     ax_1.plot(label_loc, polar_values_previous, label='Previous')
+
+            ax_1.set_ylim(0, 0.25)
+            ax_1.set_yticklabels([])
+
+            plt.thetagrids(np.degrees(label_loc), labels=categories)
+            ax_2 = fig.add_subplot(gs[2, 1])
+            ax_0.axis('equal')
+            ax_0.set_axis_off()
+            ax_2.set_axis_off()
+
+            if int(values[1]) == 2:
+                ax_0.set_title('Class_number: ' + str(values[6]), loc='right', pad=-30, fontsize=10)
+                ax_0.legend(handles=[handles[int(values[6])]], loc='upper right', fontsize=10)
+
+                obj_funct = ''
+
+                for function_ind in range(7, len(values)):
+                    obj_funct += self.obj_function_names[int(values[function_ind])]
+                    obj_funct += '\n  '
+
+                # ax_0.text(288, 0, 'Object_function: \n  ' + obj_funct, fontsize=10) # y = 212
+
+            ax_0.set_title('Floor plan design', loc='center', fontweight='bold')
+
+            # axs[1].set_title('Object function value: ' + str(values[0]), loc='left', fontsize=12, style='italic')
+            # axs[1].set_xlim(0, gens.shape[0])
+            # axs[1].set_ylim(0, 1)
+            #
+            ax_2.set_title('  Legend', fontsize=12, style='italic')
+            # axs[2].set_axis_off()
+            ax_2.legend(handles=handles, ncol=2)
 
             x_list = np.append(countur_coords[:, 0], countur_coords[0, 0])
             y_list = np.append(countur_coords[:, 1], countur_coords[0, 1])
-            axs[0].plot(x_list, y_list, color="black")
+            ax_0.plot(x_list, y_list, color="black")
 
             for line in self.windows_lines:
-                axs[0].plot([line[0, 0], line[1, 0]], [line[0, 1], line[1, 1]], color="blue")
+                ax_0.plot([line[0, 0], line[1, 0]], [line[0, 1], line[1, 1]], color="blue", linewidth=3,
+                          marker='h', markerfacecolor='lightgreen', markeredgewidth=2,
+                          markersize=8, markevery=1)
 
             transformed_gen = []
             first_index = 0
@@ -1281,10 +1430,12 @@ class Optimizer:
                 for rect in rect_class:
                     x_list = np.append(rect[:, 0], rect[0, 0])
                     y_list = np.append(rect[:, 1], rect[0, 1])
-                    axs[0].plot(x_list, y_list, color=color)
+                    ax_0.plot(x_list, y_list, color=color)
 
-            for dynasty in range(dynasties_values.shape[1]):
-                axs[1].plot(range(i), dynasties_values[:i, dynasty].flatten())
+            # for dynasty in range(dynasties_values.shape[1]):
+            #     axs[1].plot(range(i), dynasties_values[:i, dynasty].flatten())
+
+            # axs[1].plot(range(i), best_values[:i].flatten())
 
             fig.savefig(f"Scrins/band{i}.jpg", dpi=150, bbox_inches='tight', pad_inches=0)
 

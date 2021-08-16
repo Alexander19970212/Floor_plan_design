@@ -46,7 +46,11 @@ class EvolSearch:
         self.num_processes = evol_params.get('num_processes', None)
         self.dynasties_best_values = []
         self.best_in_dynasties = []
+        self.sep_fitness = np.array([])
+        self.best_sep_fitness = None
         self.best_gen = None
+        self.direct_evolution = False
+        self.mutation_coefficient = 0.1
 
         # check for fitness function kwargs
         if 'fitness_args' in evol_params.keys():
@@ -104,9 +108,11 @@ class EvolSearch:
         """
         if self.optional_args:  # for the case with kwargs
             if len(self.optional_args) == 1:
-                return self.fitness_function(self.pop[individual_index, :], self.optional_args[0])
+                return self.fitness_function(self.pop[individual_index, :], self.optional_args[0],
+                                             self.direct_evolution)
             else:
-                return self.fitness_function(self.pop[individual_index, :], self.optional_args[individual_index])
+                return self.fitness_function(self.pop[individual_index, :], self.optional_args[individual_index],
+                                             self.direct_evolution)
         else:
             return self.calibration_function(self.pop[individual_index, :])
 
@@ -118,11 +124,13 @@ class EvolSearch:
         """
         if self.optional_args:  # for the case with kwargs
             if len(self.optional_args) == 1:
-                return self.fitness_function(self.pop[individual_index, :], self.optional_args[0])
+                return self.fitness_function(self.pop[individual_index, :], self.optional_args[0],
+                                             self.direct_evolution)
             else:
-                return self.fitness_function(self.pop[individual_index, :], self.optional_args[individual_index])
+                return self.fitness_function(self.pop[individual_index, :], self.optional_args[individual_index],
+                                             self.direct_evolution)
         else:
-            return self.fitness_function(self.pop[individual_index, :], self.coefficients)
+            return self.fitness_function(self.pop[individual_index, :], self.coefficients, self.direct_evolution)
 
     def mutation(self, parents, n_copies, mask, cross):
         """
@@ -154,7 +162,8 @@ class EvolSearch:
             gen = []  # for new (mutated) gen
             for hrom_gen, hrom_random, hrom_mask in zip(gen_copy, random_mat_gen, mask_gen):  # cycle be chromosomes
                 #  making 1-d array, 1 - there is mutation in variable, 0 - there isn't mutation
-                mut_mask = np.random.choice(2, len(hrom_gen), p=[0.7, 0.3]) * hrom_mask  # making mutation more rare
+                mut_mask = np.random.choice(2, len(hrom_gen), p=[1 - self.mutation_coefficient,
+                                                                 self.mutation_coefficient]) * hrom_mask  # making mutation more rare
                 negative_mut_mask = (mut_mask - 1) * (-1)  # opposite matrix
                 # from initial chromosome variable is replaced by variable from random chromosome
                 hrom_gen = hrom_gen * negative_mut_mask + hrom_random * mut_mask
@@ -181,9 +190,10 @@ class EvolSearch:
                 for parent_2 in parents:  # choosing the second parent
                     if random.randint(0, 1) and i != j:  # cross will occur randomly and if parents are not same
                         # chromosomes which will be crossed are selected according random list
-                        mask = np.random.choice(2, parent_1.shape[0], p=[0.8, 0.2])
+                        mask = np.random.choice(2, parent_1.shape[0],
+                                                p=[1 - self.mutation_coefficient, self.mutation_coefficient])
                         negativ_mask = (mask - 1) * (-1)  # opposite matrix
-                        try: # for some reason, some genes don't cross
+                        try:  # for some reason, some genes don't cross
                             # from the first parent some chromosomes are removed and chromosomes from the second parents
                             # are added to that places
                             child = parent_1 * negativ_mask + parent_2 * mask
@@ -216,6 +226,7 @@ class EvolSearch:
         # returned list contains mask of broken genes and fitness value, so that is separated
         self.fitness = np.array(self.fitness, dtype="object")  # transforming to numpy array
         self.mask_broken = self.fitness[:, 1]  # extraction of mask for mutation
+        self.sep_fitness = self.fitness[:, 2]
         self.fitness = self.fitness[:, 0]  # remaining values are fitness values list
 
         # separate to dynasties
@@ -235,6 +246,7 @@ class EvolSearch:
         best_index = np.argsort(self.fitness * (-1))[-1:]
         # self.dynasties_best_values.append(self.pop[best_index])
         self.best_gen = self.pop[best_index]
+        self.best_sep_fitness = self.sep_fitness[best_index]
 
         # work over each dynasty separately
         for pop, fitness, mask_broken in zip(self.dynasties_pop, self.dynasties_fitness, self.dynasty_mask_broken):
@@ -244,7 +256,7 @@ class EvolSearch:
             # initial of parents
             parents_indexes = np.argsort(fitness * (-1))[-self.elitist_fraction:]  # select parents
             bufer_pop = pop[parents_indexes, :]
-            self.best_in_dynasties.append(pop[np.argsort(fitness*(-1))[-1:]])
+            self.best_in_dynasties.append(pop[np.argsort(fitness * (-1))[-1:]])
 
             #  saving best value
             self.dynasties_best_values.append(np.min(fitness))
@@ -335,6 +347,9 @@ class EvolSearch:
         '''
         return np.min(self.fitness)
 
+    def get_best_sep_values(self):
+        return self.best_sep_fitness
+
     def get_mean_fitness(self):
         '''
         returns the mean fitness of the population
@@ -346,6 +361,13 @@ class EvolSearch:
         returns variance of the population's fitness
         '''
         return np.std(self.fitness) ** 2
+
+    def set_direct_evolution(self, arg):
+
+        self.direct_evolution = arg
+
+    def set_mutation_coefficient(self, coeff):
+        self.mutation_coefficient = coeff
 
 
 if __name__ == "__main__":
