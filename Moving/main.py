@@ -102,9 +102,14 @@ class Optimizer:
         self.coefficients = np.array([])
         self.best_evol_individuals = np.array([])
 
+        self.coefficients = np.array([1.10906925e+05, 1.32900344e+07, 2.61423559e+03, 4.40713947e+04])
+
         self.evol_optimization()
         # self.direct_optimization()
-        self.map_optimization()
+        # self.get_last_gen("test_gens.txt", gen)
+        # self.map_optimization()
+
+
         self.artist("test_gens.txt", 'test_values.txt', gen)  # Plot rendering and saving as GIF
         print(self.coefficients)
 
@@ -132,7 +137,7 @@ class Optimizer:
         '''OPTION 2'''
         # keep searching till a stopping condition is reached
         num_gen = 0  # counter of pops
-        max_num_gens = 300  # Maximal amount of pops
+        max_num_gens = 900  # Maximal amount of pops
         desired_fitness = 0.05  # sufficient value of object function for finishing
 
         repeat_counter = 0
@@ -305,10 +310,10 @@ class Optimizer:
             es.set_function_indexes(cl_funtions_indexes)
             num_gen = int((len(self.best_evol_individuals[cl_obj]) - 9) / 2)
 
-            sorted_ind_list = (num_gen-1) - es.get_sorted_objects()
+            sorted_ind_list = es.get_sorted_objects()
             #  Evolutionary search will be stopped if population counter is exceeded or satisfactory solution is found
-            ############## for object_index in sorted_ind_list:
-            for object_index in range(0, num_gen):
+            for object_index in sorted_ind_list:
+            #for object_index in range(0, num_gen):
                 # while es.get_best_individual_fitness() > desired_fitness and num_gen < max_num_gens:
                 best_ind = es.get_best_individual_fitness()
                 print('Class #' + str(cl_obj) + ' ' + str(object_index) + '/' + str(num_gen) + ' Best Fitness = ' + str(
@@ -1287,6 +1292,31 @@ class Optimizer:
 
         return mask_gen, amount_intersections
 
+    def get_last_gen(self, filename_gens, gen_example):
+
+        gens = []
+        with open(filename_gens, "r") as file:
+            for line in file:
+                gens.append(line.split())
+
+        gens = gens[1:]
+        gens = np.float_(gens)
+        gens = np.array(gens)
+
+        gen = gens[-1]
+
+        transformed_gen = []
+        first_index = 0
+        gen_example = np.array(gen_example, dtype='object')
+        for obj_class in gen_example:
+            length = len(obj_class)
+
+            transformed_gen.append(gen[first_index:first_index + length])
+            first_index += length
+
+        self.best_evol_individuals = np.array(transformed_gen, dtype="object")
+
+
     def artist(self, filename_gens, filename_values, gen_example, gif_time=100, type_draw="all"):
         from shapely.ops import unary_union
         from shapely.geometry import Polygon, mapping
@@ -1616,3 +1646,4 @@ if __name__ == "__main__":
 # "Engineers", "Printers_eng", "Administration", "Printers_adm",
 # "Professor_2", "Professor_1", "Professor_3",
 # "Machine_tool_1", "Machine_tool_2"
+# [1.10906925e+05 1.32900344e+07 2.61423559e+03 4.40713947e+04]
