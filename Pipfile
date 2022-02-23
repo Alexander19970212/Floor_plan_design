@@ -9,6 +9,7 @@ matplotlib = "*"
 pillow = "*"
 pathos = "*"
 shapely = "*"
+torch = "*"
 
 [dev-packages]
 
