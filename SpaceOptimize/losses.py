@@ -37,3 +37,16 @@ def illumination(group):
 
     return shortage_illuminations.sum(1), excess_illumination.sum(
         1), shortage_illuminations, excess_illumination, shortage_illuminations.sum() + excess_illumination.sum()
+
+
+def sum_sqr_shortest_path(acquired_obj_group):
+    """
+    Functions returns the sum of sqr path for objects of group_1 to the nearest object form group_2. Groups were defined
+    in acquired_obj_group.
+    :param acquired_obj_group: Object with type Acquired_group
+    :return: torch vector of sum for batches
+    """
+
+    shortest_path = acquired_obj_group.get_parametrs("Path_lengths")  # torch tensor with size (batch_size, n_ob_group1)
+
+    return torch.sqrt(shortest_path).sum(1)
