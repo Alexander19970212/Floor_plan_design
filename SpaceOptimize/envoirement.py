@@ -26,6 +26,10 @@ class Border:
 class Wall(Border):
     pass
 
+@dataclass()
+class Septum:
+    pass
+
 
 @dataclass
 class Window(Border):
@@ -46,7 +50,7 @@ class Area:
     обновления как временного, так и постоянного с учетом батчей.
     """
 
-    def __init__(self, walls: List[Wall], windows: List[Window], septum: List[Wall], windows_koeff, *, surface=None):
+    def __init__(self, walls: List[Wall], windows: List[Window], septum: List[Septum], windows_koeff, *, surface=None):
         self.walls = walls
         self.windows = windows
         self.septum = septum
@@ -54,13 +58,29 @@ class Area:
 
         self.quantization_step = 0.002
         self.grid_coord_step = 0.01
+        self.artificial_natural_illum_koeff = 0.25
+
+        self.border = None
+        self.quant_coord = None
+        self.quant_coord_torch = None
+        self.constant_illumination = None
+        self.constant_illumination_torch = None
+        self.obj_grid = None
+
+        self.update_parameters()
+
+    def update_parameters(self):
+        """
+        The function recalculates parameters: border, quant_coord, quant_coord_torch, constant_illumination,
+        constant_illumination_torch, obj_group.
+        """
         self.border = self.find_border()
         self.quant_coord = self.quantization(self.quantization_step)
         self.quant_coord_torch = torch.from_numpy(self.quant_coord)
         self.constant_illumination = self.calculate_constant_illumination()
         self.constant_illumination_torch = torch.from_numpy(np.array(self.constant_illumination))
-        self.artificial_natural_illum_koeff = 0.25
         self.obj_grid = self.calculate_vailable_coord()
+
 
     def find_border(self):
         """
@@ -171,27 +191,24 @@ class Area:
         return self.quantization(self.grid_coord_step)
 
 
-    def append_object(self, object: OptimizedObject):
-        pass
+    def append_object(self, new_object):
+        """
+        The function adds obj from outside and updates parameters.
+        """
+        if new_object.type == List[Window]:
+            self.windows.extend(new_object)
+        elif new_object.type == List[Wall]:
+            self.walls.extend(new_object)
+        elif new_object.type == List[Septum]:
+            self.septum.extend(new_object)
 
-    def get_surface_lumen(self):
-        pass
+        self.update_parameters()
 
-    def update_temp(self, object: SpaceObjects):
-        """
-        Пересчитывает параметры Area исходя их параметров групп обектов. Создает временные пераметры
-        :param object:
-        :return:
-        """
-        pass
 
-    def update_perm(self, object: SpaceObjects):
-        """
-        Пересчитывает параметры Area исходя их параметров групп обектов. Создает временные пераметры
-        :param object:
-        :return:
-        """
-        pass
+    """
+    I removed def for updating permanent and temporary parameters because I don't see it for object with type of class 
+    environment. But it could be changed.
+    """
 
     def get_illum_distribution(self):
         """
@@ -206,7 +223,7 @@ class Area:
          Хорошо бы было реализовать эту функцию у всех типов объектов.
          : return: torch tensor with size (N_batches, N_quant_points)
         """
-        light_koeff, light_point = virt_obj.get_param('Illumination', crd=True)
+        light_koeff, light_points = virt_obj.get_param('Illumination', crd=True)
 
         # coord is numpy array and has size (N_batches, N_light_points, 2)
         # N_points in batches have to have the same lengths. If it are different, it should be added random new
