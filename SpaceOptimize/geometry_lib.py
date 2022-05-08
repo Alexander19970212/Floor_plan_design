@@ -38,14 +38,26 @@ def magnitude(vector):
     """
     This function is additional.
     """
-    return np.sqrt(np.diag(np.tensordot(np.array(vector), np.array(vector), axes=[1, 1])))
+    print("magnitude_before_2")
+    print(vector)
+    magn = np.tensordot(vector, vector, axes=[1, 1])
+    print("first_step")
+    magn = np.diag(magn)
+    print("second_step")
+    magn = np.sqrt(magn)
+    # magn = np.sqrt(np.diag(np.tensordot(np.array(vector), np.array(vector), axes=[1, 1])))
+    print("magn_output")
+    return magn
 
 
 def norm(vector):
     """
     This function is additional.
     """
-    return np.array(vector) / magnitude(np.array(vector))[:, np.newaxis]
+    print("Norms")
+    nr = np.array(vector) / magnitude(np.array(vector))[:, np.newaxis]
+    print("norm_putput")
+    return nr
 
 
 def lineRayIntersectionPoint2(rayOrigin, rayDirection, point1, point2):
@@ -64,7 +76,8 @@ def lineRayIntersectionPoint2(rayOrigin, rayDirection, point1, point2):
     """
     # Convert to numpy arrays
     rayOrigin = np.array(rayOrigin, dtype=np.float)
-    rayDirection = np.array(norm(rayDirection), dtype=np.float)
+    # rayDirection = np.array(norm(rayDirection), dtype=np.float)
+    rayDirection = np.array(rayDirection, dtype=np.float)
     point1 = np.array(point1, dtype=np.float)
     point2 = np.array(point2, dtype=np.float)
 

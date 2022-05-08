@@ -4,10 +4,11 @@ from typing import List
 from turtle import window_width
 from geometry_lib import check_intersect, lineRayIntersectionPoint2, norm, check_intersect_batch
 import torch
-from shapely.geometry import Point, LineString, Polygon
+from shapely.geometry import LineString, Polygon
+import shapely.geometry as shp
 import numpy as np
 
-from .interfaces import OptimizedObject
+# from .interfaces import OptimizedObject
 
 
 @dataclass
@@ -24,21 +25,23 @@ class Border:
 
 @dataclass
 class Wall(Border):
-    pass
+    reflectivity: float
 
-@dataclass()
-class Septum:
-    pass
+@dataclass
+class Septum(Border):
+    reflectivity: float
 
 
 @dataclass
 class Window(Border):
+    # start = Point
+    # end = Point
     illumination: float
 
 
-class Table(OptimizedObject):
-    def get_coords(self) -> List[Point]:
-        return super().get_coords()
+# class Table(OptimizedObject):
+#     def get_coords(self) -> List[Point]:
+#         return super().get_coords()
 
 
 class Area:
@@ -51,9 +54,14 @@ class Area:
     """
 
     def __init__(self, walls: List[Wall], windows: List[Window], septum: List[Septum], windows_koeff, *, surface=None):
-        self.walls = walls
-        self.windows = windows
-        self.septum = septum
+        self.walls_ = walls
+        self.windows_ = windows
+        self.septum_ = septum
+
+        self.walls = self.get_matrix(walls)
+        self.windows = self.get_matrix(windows)
+        self.septum = self.get_matrix(septum)
+
         self.windows_weights = windows_koeff
 
         self.quantization_step = 0.002
@@ -69,18 +77,29 @@ class Area:
 
         self.update_parameters()
 
+    def get_matrix(self, list_obj):
+        obj_matrix = []
+        for one_obj in list_obj:
+            obj_matrix.append([[one_obj.start.x, one_obj.start.y], [one_obj.end.x, one_obj.end.y]])
+
+        return np.array(obj_matrix)
+
+
     def update_parameters(self):
         """
         The function recalculates parameters: border, quant_coord, quant_coord_torch, constant_illumination,
         constant_illumination_torch, obj_group.
         """
         self.border = self.find_border()
+        print("Border")
         self.quant_coord = self.quantization(self.quantization_step)
         self.quant_coord_torch = torch.from_numpy(self.quant_coord)
+        print("Quant")
         self.constant_illumination = self.calculate_constant_illumination()
+        print("constant_illum")
         self.constant_illumination_torch = torch.from_numpy(np.array(self.constant_illumination))
+        print("c_ill_to_torch")
         self.obj_grid = self.calculate_vailable_coord()
-
 
     def find_border(self):
         """
@@ -91,14 +110,14 @@ class Area:
 
         border = []
 
-        start_point = [self.walls[0].start.x, self.walls[0].start.y]
-        end_point = [self.walls[0].end.x, self.walls[0].end.y]
+        start_point = [self.walls_[0].start.x, self.walls_[0].start.y]
+        end_point = [self.walls_[0].end.x, self.walls_[0].end.y]
         border.append(start_point)
 
         while end_point != start_point:
             border.append(end_point)
             find_point_flag = False
-            for wall in self.walls:
+            for wall in self.walls_:
                 if [wall.start.x, wall.start.y] == end_point:
                     end_point = [wall.end.x, wall.end.y]
                     find_point_flag = True
@@ -108,8 +127,9 @@ class Area:
 
     def quantization(self, quant_step):
         # border numpy array with coords of points of border. Size is (N, 2)
-        min_x_y = self.border.min(axis=0)
-        max_x_y = self.border.max(axis=0)
+        border = self.walls[:, 0, :]
+        min_x_y = border.min(axis=0)
+        max_x_y = border.max(axis=0)
 
         step = min((max_x_y[0] - min_x_y[0]) * quant_step,
                    (max_x_y[1] - min_x_y[1]) * quant_step)
@@ -126,13 +146,13 @@ class Area:
         x_coords = np.tile(x_coords, y_size).T[:, :, np.newaxis]
         coords = np.concatenate((x_coords, y_coords), axis=2)
 
-        countur_polygon = Polygon(self.border)
+        countur_polygon = Polygon(border)
 
         coords = coords.reshape((coords.shape[0] * coords.shape[1], coords.shape[2]))
         contained_points = np.zeros(coords.shape[0])
 
         for i, point in enumerate(coords):
-            contained_points[i] = countur_polygon.contains(Point(point))
+            contained_points[i] = countur_polygon.contains(shp.Point(point))
 
         # print(contained_points)
 
@@ -154,15 +174,23 @@ class Area:
         :return: float list with value of illumination for each quanted point.
         """
         list_illumination = []
+        # print("before_preparing")
 
         angles = np.arange(0, 360, 1.0)
         norms = np.array([np.cos(angles * np.pi / 180), np.sin(angles * np.pi / 180)]).T
-        d = norm(norms)
+        # print("before_norming")
+        # d = norm(norms)
+        d = norms
+        # print("prepare")
 
         all_sep = np.append(self.walls, self.septum, axis=0)
 
+        # print("cucle")
+
         for r in self.quant_coord:
+
             points, intersect_mat = lineRayIntersectionPoint2(r, d, self.windows[:, 0, :], self.windows[:, 1, :])
+            # print("intersection")
             secondary_intersection = np.zeros_like(intersect_mat)
             foundet_points = points[intersect_mat]
 
@@ -170,8 +198,9 @@ class Area:
             rays[:, 0] = foundet_points
             rays[:, 1] = r
 
+            # print("check_inter")
             result_intersections = check_intersect(walls=all_sep, rays=rays) * 1
-            print(result_intersections.shape)
+            # print(result_intersections.shape)
             result_intersections = result_intersections.sum(1)
             result_intersections = (result_intersections <= 1) * 1
 
@@ -206,16 +235,18 @@ class Area:
 
 
     """
-    I removed def for updating permanent and temporary parameters because I don't see it for object with type of class 
+    I removed defs for updating permanent and temporary parameters because I don't see it for object with type of class 
     environment. But it could be changed.
     """
 
-    def get_illum_distribution(self):
+    def get_illum_distribution(self, virt_obj):
         """
         Функция возворащает распределение освещенности в каком-то виде (решить позже). Необходама для
         расчета целевых функций.
         к этой фонкции обращается целевая функция через посредника с целью обеспечения универсализации.
         Повредниками могут быть Space_obj, group_obj, builder. Собственно тот, кто будет выполнять расчет ФФ.
+
+        !!!!!!!!!!!!!!virt_obj is temporary solution
 
         Фонкция выполняет запрос с целью получения освещенности от объектов.
         Запрос может проводиться у group_obj, space_obj. Возможно данный объект стоит подавать на вход (надо подумать)
@@ -266,7 +297,7 @@ class Area:
             type = numpy array;
             size = (N_quants, 2 (x, y))
             """
-            return self.constant_illumination
+            return self.quant_coord, self.constant_illumination
 
         elif param == "coord_grid":
             """
@@ -302,6 +333,8 @@ class Area:
             size = (N_batch, N_quant)
             """
             return self.get_illum_distribution()
+
+
 
 
 
