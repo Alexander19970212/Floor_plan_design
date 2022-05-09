@@ -9,3 +9,4 @@ fp_out = "image.gif"
 
 img = images[0]
 img.save(fp=fp_out, format="GIF", append_images=images[1:], save_all=True, duration=0.1, loop=0)
+#print(kjjblkijiabnlkdjbfljkab)
